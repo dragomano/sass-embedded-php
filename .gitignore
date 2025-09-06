@@ -1,0 +1,10 @@
+.idea/
+.phpunit.result.cache
+.phpunit.cache/
+.vscode/
+composer.lock
+package-lock.json
+coverage.xml
+coverage/
+vendor/
+node_modules/

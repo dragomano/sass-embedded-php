@@ -1,0 +1,9 @@
+{
+  "name": "sass-embedded-php",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "sass-embedded": "^1.92.0"
+  }
+}

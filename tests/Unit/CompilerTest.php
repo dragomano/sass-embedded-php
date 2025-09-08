@@ -41,17 +41,44 @@ it('compiles with sourceMap enabled', function () {
         'sourceMapIncludeSources' => true,
     ]);
 
-    expect($css)->toMatch('/\/\*# sourceMappingURL=.*\.map \*\//');
+    expect($css)->toMatch('/\/\*# sourceMappingURL=data:application\/json;base64,/')
+        ->and($css)->not()->toMatch('/\/\*# sourceMappingURL=.*\.map \*\//');
 
-    preg_match('/sourceMappingURL=(.*\.map)/', $css, $matches);
-    $mapFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $matches[1];
-
-    expect(file_exists($mapFile))->toBeTrue();
-
-    $mapContent = json_decode(file_get_contents($mapFile), true);
+    preg_match('/sourceMappingURL=data:application\/json;base64,([^ ]*)/', $css, $matches);
+    $encodedMap = $matches[1];
+    $decodedMap = base64_decode($encodedMap);
+    $mapContent = json_decode($decodedMap, true);
 
     expect($mapContent)->toHaveKey('version')
-        ->and($mapContent)->toHaveKey('mappings');
+        ->and($mapContent)->toHaveKey('mappings')
+        ->and($mapContent)->toHaveKey('sourcesContent');
+});
+
+it('compiles and saves file with sourceMap next to CSS', function () {
+    $inputFile = __DIR__ . '/test_source.scss';
+    $outputFile = __DIR__ . '/test_output.css';
+    $mapFile = __DIR__ . '/test_output.css.map';
+
+    file_put_contents($inputFile, '$color: green; .test { color: $color; }');
+
+    $this->compiler->compileFileAndSave($inputFile, $outputFile, [
+        'sourceMap' => true,
+        'sourceMapIncludeSources' => true,
+    ]);
+
+    expect(file_exists($outputFile))->toBeTrue()
+        ->and(file_exists($mapFile))->toBeTrue();
+
+    $css = file_get_contents($outputFile);
+    expect($css)->toContain('/*# sourceMappingURL=test_output.css.map */');
+
+    $mapContent = json_decode(file_get_contents($mapFile), true);
+    expect($mapContent)->toHaveKey('sourcesContent')
+        ->and($mapContent['sources'])->toBeArray();
+
+    unlink($inputFile);
+    unlink($outputFile);
+    unlink($mapFile);
 });
 
 it('compiles simple SASS syntax to CSS', function () {

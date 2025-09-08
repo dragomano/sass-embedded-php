@@ -5,21 +5,23 @@ namespace Bugo\Sass;
 use Symfony\Component\Process\Process;
 
 use function array_merge;
+use function base64_encode;
 use function basename;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
 use function filemtime;
-use function getcwd;
+use function filter_var;
 use function is_array;
 use function is_dir;
 use function json_decode;
 use function json_encode;
+use function parse_url;
+use function pathinfo;
 use function realpath;
+use function strtolower;
 use function strtoupper;
 use function substr;
-use function sys_get_temp_dir;
-use function tempnam;
 use function trim;
 
 class Compiler implements CompilerInterface
@@ -52,10 +54,6 @@ class Compiler implements CompilerInterface
         }
 
         $options = array_merge($this->options, $options);
-
-        if (! isset($merged['url'])) {
-            $options['url'] = 'file://' . getcwd() . '/string.scss';
-        }
 
         return $this->compileSource($source, $options);
     }
@@ -94,6 +92,10 @@ class Compiler implements CompilerInterface
         $outputMtime = file_exists($outputPath) ? filemtime($outputPath) : 0;
 
         if ($inputMtime > $outputMtime) {
+            if (! empty($options['sourceMap']) && empty($options['sourceMapPath'])) {
+                $options['sourceMapPath'] = $outputPath;
+            }
+
             $css = $this->compileFile($inputPath, $options);
             file_put_contents($outputPath, $css);
 
@@ -108,7 +110,7 @@ class Compiler implements CompilerInterface
         $payload = [
             'source' => $source,
             'options' => $options,
-            'url' => $options['url'],
+            'url' => $options['url'] ?? null,
         ];
 
         return $this->runCompile($payload);
@@ -139,13 +141,53 @@ class Compiler implements CompilerInterface
 
         $css = $data['css'] ?? '';
 
-        if (! empty($payload['options']['sourceMap']) && ! empty($data['sourceMap'])) {
-            $mapFile = tempnam(sys_get_temp_dir(), 'sass_') . '.map';
-            file_put_contents($mapFile, json_encode($data['sourceMap']));
-            $css .= "\n/*# sourceMappingURL=" . basename($mapFile) . " */";
+        if (! empty($data['sourceMap'])) {
+            $css .= $this->processSourceMap($data['sourceMap'], $payload['options']);
         }
 
         return $css;
+    }
+
+    protected function processSourceMap(array $sourceMap, array $options): string
+    {
+        if (! empty($options['sourceMapPath'])) {
+            $mapFile = (string) $options['sourceMapPath'];
+
+            $isUrl = filter_var($mapFile, FILTER_VALIDATE_URL) !== false;
+            if ($isUrl) {
+                $sourceMappingUrl = $mapFile;
+            } else {
+                if (is_dir($mapFile)) {
+                    $sourceFilename = $this->getSourceFilenameFromUrl($options['url'] ?? '');
+                    $mapFile .= DIRECTORY_SEPARATOR . $sourceFilename . '.map';
+                } elseif (strtolower(substr($mapFile, -4)) !== '.map') {
+                    $mapFile .= '.map';
+                }
+
+                file_put_contents($mapFile, json_encode($sourceMap));
+                $sourceMappingUrl = basename($mapFile);
+            }
+
+            return "\n/*# sourceMappingURL=" . $sourceMappingUrl . " */";
+        } else {
+            $mapData = json_encode($sourceMap);
+            $encodedMap = base64_encode($mapData);
+            return "\n/*# sourceMappingURL=data:application/json;base64," . $encodedMap . " */";
+        }
+    }
+
+    protected function getSourceFilenameFromUrl(string $url): string
+    {
+        if ($url === '') {
+            return 'style';
+        }
+
+        $parsed = parse_url($url);
+        $path = $parsed['path'] ?? '';
+        $basename = basename($path);
+        $info = pathinfo($basename);
+
+        return $info['filename'] ?: 'style';
     }
 
     protected function readFile(string $path): string|false

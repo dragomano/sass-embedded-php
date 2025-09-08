@@ -59,7 +59,35 @@ $css = $compiler->compileString($scss);
 echo $css;
 ```
 
-### Безопасная компиляция
+### Компиляция из строки с опциями
+
+```php
+<?php
+require __DIR__ . '/vendor/autoload.php';
+
+use Bugo\Sass\Compiler;
+
+$compiler = new Compiler();
+
+$scss = <<<'SCSS'
+$color: #3498db;
+$font-size: 14px;
+
+body {
+  font-size: $font-size;
+  color: $color;
+}
+SCSS;
+
+$css = $compiler->compileString($scss, [
+    'compressed' => true,
+    'sourceMap' => true
+]);
+
+echo $css;
+```
+
+### Перехват ошибок при компиляции
 
 ```php
 require __DIR__ . '/vendor/autoload.php';
@@ -109,6 +137,28 @@ try {
 
 Этот метод автоматически проверяет, был ли изменён исходный файл с момента последней компиляции, и компилирует и сохраняет только если обнаружены изменения.
 
+### Компиляция файла с картами источников и сжатым выводом
+
+```php
+<?php
+require __DIR__ . '/vendor/autoload.php';
+
+use Bugo\Sass\Compiler;
+
+$compiler = new Compiler();
+
+$css = $compiler->compileFile(__DIR__ . '/assets/app.scss', [
+    'sourceMap' => true,
+    'sourceMapIncludeSources' => true,
+    'sourceMapPath' => __DIR__ . '/assets/',
+    'style' => 'compressed',
+]);
+
+file_put_contents(__DIR__ . '/assets/app.css', $css);
+
+echo "CSS скомпилирован с картой источников!\n";
+```
+
 ## Параметры
 
 Пути к bridge.js и Node указываются только через конструктор:
@@ -117,15 +167,31 @@ try {
 $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 ```
 
-Остальные параметры можно включать как для всего компилятора сразу, так и для конкретного метода отдельно:
+| Параметр | Тип | Описание | Возможные значения |
+|-------|----|----------|--------------|
+| syntax | string | Синтаксис входного файла | 'scss' для SCSS, 'indented' или 'sass' для SASS |
+| style | string | Стиль вывода | 'compressed' или 'expanded' |
+| sourceMap | bool | Генерировать карту источников | true или false |
+| sourceMapIncludeSources | bool | Включать исходный код в карту | true или false |
+| sourceMapPath | string | URL-адрес уже созданной карты или путь для сохранения новой | |
+
+Для некоторых параметров есть альтернативы:
+
+| Параметр | Тип | Описание | Возможные значения |
+|---|---|---|---|
+| compressed | bool | То же, что и 'style' => 'compressed' | true или false |
+| minimize | bool | То же, что и 'style' => 'compressed' | true или false |
+
+Параметры можно включать как для всего компилятора сразу, так и для конкретного метода отдельно:
 
 ```php
 $compiler->setOptions([
-    'syntax' => 'sass', // 'scss' | 'sass'
-    'compressed' => true, // false | true
+    'syntax' => 'indented',
+    'minimize' => true,
+    'sourceMap' => true,
 ]);
-````
+```
 ```php
-$compiler->compileString($string, ['syntax' => 'sass']);
-$compiler->compileFile($file, ['compressed' => true]);
+$compiler->compileString($string, ['compressed' => true]);
+$compiler->compileFile($file, ['syntax' => 'sass']);
 ```

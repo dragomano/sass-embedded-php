@@ -59,7 +59,35 @@ $css = $compiler->compileString($scss);
 echo $css;
 ```
 
-### Safe compilation
+### Compiling string with options
+
+```php
+<?php
+require __DIR__ . '/vendor/autoload.php';
+
+use Bugo\Sass\Compiler;
+
+$compiler = new Compiler();
+
+$scss = <<<'SCSS'
+$color: #3498db;
+$font-size: 14px;
+
+body {
+  font-size: $font-size;
+  color: $color;
+}
+SCSS;
+
+$css = $compiler->compileString($scss, [
+    'compressed' => true,
+    'sourceMap' => true
+]);
+
+echo $css;
+```
+
+### Catching compilation errors
 
 ```php
 require __DIR__ . '/vendor/autoload.php';
@@ -109,6 +137,28 @@ try {
 
 This method automatically checks if the source file has been modified since the last compilation and only compiles and saves if changes are detected.
 
+### Compiling file with source maps and compressed output
+
+```php
+<?php
+require __DIR__ . '/vendor/autoload.php';
+
+use Bugo\Sass\Compiler;
+
+$compiler = new Compiler();
+
+$css = $compiler->compileFile(__DIR__ . '/assets/app.scss', [
+    'sourceMap' => true,
+    'sourceMapIncludeSources' => true,
+    'sourceMapPath' => __DIR__ . '/assets/',
+    'style' => 'compressed',
+]);
+
+file_put_contents(__DIR__ . '/assets/app.css', $css);
+
+echo "CSS compiled with source map!\n";
+```
+
 ## Parameters
 
 Paths to bridge.js and Node are specified only through the constructor:
@@ -117,15 +167,31 @@ Paths to bridge.js and Node are specified only through the constructor:
 $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 ```
 
-Other parameters can be set either for the entire compiler at once or for a specific method separately:
+| Option | Type | Description | Possible values |
+|--------|------|-------------|-----------------|
+| syntax | string | Input syntax | 'scss' for SCSS, 'indented' or 'sass' for SASS |
+| style | string | Output style | 'compressed' or 'expanded' |
+| sourceMap | bool | Generate source map | true or false |
+| sourceMapIncludeSources | bool | Include source code in map | true or false |
+| sourceMapPath | string | URL to existing map or path for saving new |  |
+
+For some parameters there are alternatives:
+
+| Parameter | Type | Description | Possible values |
+|-----------|------|-------------|-----------------|
+| compressed | bool | Same as 'style' => 'compressed' | true or false |
+| minimize | bool | Same as 'style' => 'compressed' | true or false |
+
+Parameters can be set either for the entire compiler at once or for a specific method separately:
 
 ```php
 $compiler->setOptions([
-    'syntax' => 'sass', // 'scss' | 'sass'
-    'compressed' => true, // false | true
+    'syntax' => 'indented',
+    'minimize' => true,
+    'sourceMap' => true,
 ]);
-````
+```
 ```php
-$compiler->compileString($string, ['syntax' => 'sass']);
-$compiler->compileFile($file, ['compressed' => true]);
+$compiler->compileString($string, ['compressed' => true]);
+$compiler->compileFile($file, ['syntax' => 'sass']);
 ```

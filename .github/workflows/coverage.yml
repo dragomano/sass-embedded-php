@@ -12,10 +12,13 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: "8.2"
 
       - name: Install dependencies
         run: composer install
+
+      - name: Run Rector checks
+        run: composer run check
 
       - name: Run tests
         run: vendor/bin/pest --colors=always --coverage-clover build/logs/clover.xml

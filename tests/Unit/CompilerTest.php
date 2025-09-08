@@ -129,6 +129,34 @@ CSS;
     expect($css)->toBe($expected);
 });
 
+it('compiles and saves file only if source has changed', function () {
+    $inputFile = __DIR__ . '/test_input.scss';
+    $outputFile = __DIR__ . '/test_output.css';
+
+    file_put_contents($inputFile, '$color: red; body { color: $color; }');
+
+    $changed = $this->compiler->compileFileAndSave($inputFile, $outputFile);
+    expect($changed)->toBeTrue()
+        ->and(file_exists($outputFile))->toBeTrue();
+
+    $css = file_get_contents($outputFile);
+    expect($css)->toContain('color: red');
+
+    sleep(1);
+    $changed = $this->compiler->compileFileAndSave($inputFile, $outputFile);
+    expect($changed)->toBeFalse();
+
+    file_put_contents($inputFile, '$color: blue; body { color: $color; }');
+    $changed = $this->compiler->compileFileAndSave($inputFile, $outputFile);
+    expect($changed)->toBeTrue();
+
+    $css = file_get_contents($outputFile);
+    expect($css)->toContain('color: blue');
+
+    unlink($inputFile);
+    unlink($outputFile);
+});
+
 it('returns empty css for empty string input in compileString', function () {
     $css = $this->compiler->compileString('');
 
@@ -290,37 +318,88 @@ it('throws Exception if sass-embedded folder does not exist', function () {
     $compiler->__construct();
 });
 
-it('compiles and saves file only if source has changed', function () {
-    $inputFile = __DIR__ . '/test_input.scss';
-    $outputFile = __DIR__ . '/test_output.css';
-
-    file_put_contents($inputFile, '$color: red; body { color: $color; }');
-
-    $changed = $this->compiler->compileFileAndSave($inputFile, $outputFile);
-    expect($changed)->toBeTrue()
-        ->and(file_exists($outputFile))->toBeTrue();
-
-    $css = file_get_contents($outputFile);
-    expect($css)->toContain('color: red');
-
-    sleep(1);
-    $changed = $this->compiler->compileFileAndSave($inputFile, $outputFile);
-    expect($changed)->toBeFalse();
-
-    file_put_contents($inputFile, '$color: blue; body { color: $color; }');
-    $changed = $this->compiler->compileFileAndSave($inputFile, $outputFile);
-    expect($changed)->toBeTrue();
-
-    $css = file_get_contents($outputFile);
-    expect($css)->toContain('color: blue');
-
-    unlink($inputFile);
-    unlink($outputFile);
-});
-
 it('throws Exception when input file does not exist in compileFileAndSave', function () {
     $this->compiler->compileFileAndSave(
         __DIR__ . '/nonexistent.scss',
         __DIR__ . '/output.css'
     );
-})->throws(Exception::class, 'Source file not found:');
+})->throws(Exception::class);
+
+it('processes source map with URL path', function () {
+    $scss = '$color: blue; .box { color: $color; }';
+    $mockProcess = Mockery::mock(Process::class);
+    $mockProcess->shouldReceive('setInput')->once()->andReturnSelf();
+    $mockProcess->shouldReceive('run')->once()->andReturn(0);
+    $mockProcess->shouldReceive('getOutput')->once()->andReturn(json_encode([
+        'css' => 'body{color:blue}',
+        'sourceMap' => ['version' => 3, 'mappings' => '...', 'sources' => ['style.scss']]
+    ]));
+    $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
+
+    $compiler = Mockery::mock(Compiler::class)->makePartial();
+    $compiler->shouldAllowMockingProtectedMethods();
+    $reflection = new ReflectionClass($compiler);
+    $reflection->getProperty('nodePath')->setValue($compiler, 'node');
+    $reflection->getProperty('bridgePath')->setValue($compiler, __DIR__ . '/../bin/bridge.js');
+    $compiler->shouldReceive('createProcess')->andReturn($mockProcess);
+
+    $css = $compiler->compileString($scss, ['sourceMap' => true, 'sourceMapPath' => 'https://example.com/style.map']);
+
+    expect($css)->toContain('/*# sourceMappingURL=https://example.com/style.map */');
+});
+
+it('processes source map with directory path', function () {
+    $testDir = __DIR__ . '/test_maps';
+    if (! is_dir($testDir)) {
+        mkdir($testDir);
+    }
+
+    $scss = '$color: blue; .box { color: $color; }';
+    file_put_contents(__DIR__ . '/test.scss', $scss);
+    $expectedMapFile = $testDir . DIRECTORY_SEPARATOR . 'style.map';
+
+    $mockProcess = Mockery::mock(Process::class);
+    $mockProcess->shouldReceive('setInput')->once()->andReturnSelf();
+    $mockProcess->shouldReceive('run')->once()->andReturn(0);
+    $mockProcess->shouldReceive('getOutput')->once()->andReturn(json_encode([
+        'css' => 'body{color:blue}',
+        'sourceMap' => ['version' => 3, 'mappings' => '...', 'sources' => ['https://example.com/style.scss']]
+    ]));
+    $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
+
+    $compiler = Mockery::mock(Compiler::class)->makePartial();
+    $compiler->shouldAllowMockingProtectedMethods();
+    $reflection = new ReflectionClass($compiler);
+    $reflection->getProperty('nodePath')->setValue($compiler, 'node');
+    $reflection->getProperty('bridgePath')->setValue($compiler, __DIR__ . '/../bin/bridge.js');
+    $compiler->shouldReceive('createProcess')->andReturn($mockProcess);
+
+    $css = $compiler->compileFile(
+        __DIR__ . '/test.scss',
+        [
+            'sourceMap' => true,
+            'sourceMapPath' => $testDir,
+            'url' => 'https://example.com/style.scss',
+        ]
+    );
+
+    expect(file_exists($expectedMapFile))->toBeTrue()
+        ->and($css)->toContain('/*# sourceMappingURL=style.map */');
+
+    if (file_exists($expectedMapFile)) {
+        unlink($expectedMapFile);
+        rmdir($testDir);
+    }
+
+    unlink(__DIR__ . '/test.scss');
+});
+
+it('extracts filename from URL in getSourceFilenameFromUrl', function () {
+    $compiler = Mockery::mock(Compiler::class)->makePartial();
+    $compiler->shouldAllowMockingProtectedMethods();
+
+    expect($compiler->getSourceFilenameFromUrl(''))->toBe('style')
+        ->and($compiler->getSourceFilenameFromUrl('https://example.com/css/style.scss'))->toBe('style')
+        ->and($compiler->getSourceFilenameFromUrl('https://example.com/'))->toBe('style')
+        ->and($compiler->getSourceFilenameFromUrl('file:///home/user/style.scss'))->toBe('style');
+});

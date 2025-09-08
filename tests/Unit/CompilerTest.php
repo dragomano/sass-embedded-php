@@ -262,3 +262,38 @@ it('throws Exception if sass-embedded folder does not exist', function () {
 
     $compiler->__construct();
 });
+
+it('compiles and saves file only if source has changed', function () {
+    $inputFile = __DIR__ . '/test_input.scss';
+    $outputFile = __DIR__ . '/test_output.css';
+
+    file_put_contents($inputFile, '$color: red; body { color: $color; }');
+
+    $changed = $this->compiler->compileFileAndSave($inputFile, $outputFile);
+    expect($changed)->toBeTrue()
+        ->and(file_exists($outputFile))->toBeTrue();
+
+    $css = file_get_contents($outputFile);
+    expect($css)->toContain('color: red');
+
+    sleep(1);
+    $changed = $this->compiler->compileFileAndSave($inputFile, $outputFile);
+    expect($changed)->toBeFalse();
+
+    file_put_contents($inputFile, '$color: blue; body { color: $color; }');
+    $changed = $this->compiler->compileFileAndSave($inputFile, $outputFile);
+    expect($changed)->toBeTrue();
+
+    $css = file_get_contents($outputFile);
+    expect($css)->toContain('color: blue');
+
+    unlink($inputFile);
+    unlink($outputFile);
+});
+
+it('throws Exception when input file does not exist in compileFileAndSave', function () {
+    $this->compiler->compileFileAndSave(
+        __DIR__ . '/nonexistent.scss',
+        __DIR__ . '/output.css'
+    );
+})->throws(Exception::class, 'Source file not found:');

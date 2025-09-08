@@ -81,6 +81,34 @@ try {
 }
 ```
 
+### Компиляция файла SCSS с проверкой изменений
+
+```php
+require __DIR__ . '/vendor/autoload.php';
+
+use Bugo\Sass\Exception;
+use Bugo\Sass\Compiler;
+
+$compiler = new Compiler();
+
+try {
+    $changed = $compiler->compileFileAndSave(
+        __DIR__ . '/assets/style.scss',
+        __DIR__ . '/assets/style.css'
+    );
+
+    if ($changed) {
+        echo "CSS перекомпилирован и сохранен.\n";
+    } else {
+        echo "Изменений не обнаружено, компиляция пропущена.\n";
+    }
+} catch (Exception $e) {
+    echo "Ошибка компиляции: " . $e->getMessage();
+}
+```
+
+Этот метод автоматически проверяет, был ли изменён исходный файл с момента последней компиляции, и компилирует и сохраняет только если обнаружены изменения.
+
 ## Параметры
 
 Пути к bridge.js и Node указываются только через конструктор:

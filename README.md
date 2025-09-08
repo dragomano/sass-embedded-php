@@ -81,6 +81,34 @@ try {
 }
 ```
 
+### Compiling SCSS file with change checking
+
+```php
+require __DIR__ . '/vendor/autoload.php';
+
+use Bugo\Sass\Exception;
+use Bugo\Sass\Compiler;
+
+$compiler = new Compiler();
+
+try {
+    $changed = $compiler->compileFileAndSave(
+        __DIR__ . '/assets/style.scss',
+        __DIR__ . '/assets/style.css'
+    );
+
+    if ($changed) {
+        echo "CSS recompiled and saved.\n";
+    } else {
+        echo "No changes detected, skipped compilation.\n";
+    }
+} catch (Exception $e) {
+    echo "Compilation error: " . $e->getMessage();
+}
+```
+
+This method automatically checks if the source file has been modified since the last compilation and only compiles and saves if changes are detected.
+
 ## Parameters
 
 Paths to bridge.js and Node are specified only through the constructor:

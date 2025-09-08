@@ -9,6 +9,7 @@ use function basename;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
+use function filemtime;
 use function getcwd;
 use function is_array;
 use function is_dir;
@@ -81,6 +82,25 @@ class Compiler implements CompilerInterface
         }
 
         return $this->compileSource($content, $options);
+    }
+
+    public function compileFileAndSave(string $inputPath, string $outputPath, array $options = []): bool
+    {
+        if (! file_exists($inputPath)) {
+            throw new Exception("Source file not found: $inputPath");
+        }
+
+        $inputMtime = filemtime($inputPath);
+        $outputMtime = file_exists($outputPath) ? filemtime($outputPath) : 0;
+
+        if ($inputMtime > $outputMtime) {
+            $css = $this->compileFile($inputPath, $options);
+            file_put_contents($outputPath, $css);
+
+            return true;
+        }
+
+        return false;
     }
 
     protected function compileSource(string $source, array $options): string

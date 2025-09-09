@@ -11,4 +11,6 @@ interface CompilerInterface
     public function compileString(string $source, array $options = []): string;
 
     public function compileFile(string $filePath, array $options = []): string;
+
+    public function compileFileAndSave(string $inputPath, string $outputPath, array $options = []): bool;
 }

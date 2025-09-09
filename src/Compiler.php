@@ -150,30 +150,31 @@ class Compiler implements CompilerInterface
 
     protected function processSourceMap(array $sourceMap, array $options): string
     {
-        if (! empty($options['sourceMapPath'])) {
-            $mapFile = (string) $options['sourceMapPath'];
-
-            $isUrl = filter_var($mapFile, FILTER_VALIDATE_URL) !== false;
-            if ($isUrl) {
-                $sourceMappingUrl = $mapFile;
-            } else {
-                if (is_dir($mapFile)) {
-                    $sourceFilename = $this->getSourceFilenameFromUrl($options['url'] ?? '');
-                    $mapFile .= DIRECTORY_SEPARATOR . $sourceFilename . '.map';
-                } elseif (strtolower(substr($mapFile, -4)) !== '.map') {
-                    $mapFile .= '.map';
-                }
-
-                file_put_contents($mapFile, json_encode($sourceMap));
-                $sourceMappingUrl = basename($mapFile);
-            }
-
-            return "\n/*# sourceMappingURL=" . $sourceMappingUrl . " */";
-        } else {
+        if (empty($options['sourceMapPath'])) {
             $mapData = json_encode($sourceMap);
             $encodedMap = base64_encode($mapData);
+
             return "\n/*# sourceMappingURL=data:application/json;base64," . $encodedMap . " */";
         }
+
+        $mapFile = (string) $options['sourceMapPath'];
+
+        $isUrl = filter_var($mapFile, FILTER_VALIDATE_URL) !== false;
+        if ($isUrl) {
+            $sourceMappingUrl = $mapFile;
+        } else {
+            if (is_dir($mapFile)) {
+                $sourceFilename = $this->getSourceFilenameFromUrl($options['url'] ?? '');
+                $mapFile .= DIRECTORY_SEPARATOR . $sourceFilename . '.map';
+            } elseif (strtolower(substr($mapFile, -4)) !== '.map') {
+                $mapFile .= '.map';
+            }
+
+            file_put_contents($mapFile, json_encode($sourceMap));
+            $sourceMappingUrl = basename($mapFile);
+        }
+
+        return "\n/*# sourceMappingURL=" . $sourceMappingUrl . " */";
     }
 
     protected function getSourceFilenameFromUrl(string $url): string

@@ -167,7 +167,7 @@ Paths to bridge.js and Node are specified only through the constructor:
 $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 ```
 
-| Option | Type | Description | Possible values |
+| Parameter | Type | Description | Possible values |
 |--------|------|-------------|-----------------|
 | syntax | string | Input syntax | 'scss' for SCSS, 'indented' or 'sass' for SASS |
 | style | string | Output style | 'compressed' or 'expanded' |

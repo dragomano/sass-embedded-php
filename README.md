@@ -3,6 +3,8 @@
 ![PHP](https://img.shields.io/badge/PHP-^8.2-blue.svg?style=flat)
 [![Coverage Status](https://coveralls.io/repos/github/dragomano/sass-embedded-php/badge.svg?branch=main)](https://coveralls.io/github/dragomano/sass-embedded-php?branch=main)
 
+[По-русски](README.ru.md)
+
 > Created for research purposes, not for use on production sites!
 
 PHP wrapper for [sass-embedded](https://www.npmjs.com/package/sass-embedded) (Dart Sass via Node.js).
@@ -120,12 +122,12 @@ use Bugo\Sass\Compiler;
 $compiler = new Compiler();
 
 try {
-    $changed = $compiler->compileFileAndSave(
+    $done = $compiler->compileFileAndSave(
         __DIR__ . '/assets/style.scss',
         __DIR__ . '/assets/style.css'
     );
 
-    if ($changed) {
+    if ($done) {
         echo "CSS recompiled and saved.\n";
     } else {
         echo "No changes detected, skipped compilation.\n";
@@ -149,7 +151,7 @@ $compiler = new Compiler();
 
 $css = $compiler->compileFile(__DIR__ . '/assets/app.scss', [
     'sourceMap' => true,
-    'sourceMapIncludeSources' => true,
+    'includeSources' => true,
     'sourceMapPath' => __DIR__ . '/assets/',
     'style' => 'compressed',
 ]);
@@ -159,7 +161,7 @@ file_put_contents(__DIR__ . '/assets/app.css', $css);
 echo "CSS compiled with source map!\n";
 ```
 
-## Parameters
+## Options
 
 Paths to bridge.js and Node are specified only through the constructor:
 
@@ -167,22 +169,15 @@ Paths to bridge.js and Node are specified only through the constructor:
 $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 ```
 
-| Parameter | Type | Description | Possible values |
+| Option | Type | Description | Possible values |
 |--------|------|-------------|-----------------|
 | syntax | string | Input syntax | 'scss' for SCSS, 'indented' or 'sass' for SASS |
 | style | string | Output style | 'compressed' or 'expanded' |
 | sourceMap | bool | Generate source map | true or false |
-| sourceMapIncludeSources | bool | Include source code in map | true or false |
+| includeSources | bool | Include source code in map | true or false |
 | sourceMapPath | string | URL to existing map or path for saving new |  |
 
-For some parameters there are alternatives:
-
-| Parameter | Type | Description | Possible values |
-|-----------|------|-------------|-----------------|
-| compressed | bool | Same as 'style' => 'compressed' | true or false |
-| minimize | bool | Same as 'style' => 'compressed' | true or false |
-
-Parameters can be set either for the entire compiler at once or for a specific method separately:
+Options can be set either for the entire compiler at once or for a specific method separately:
 
 ```php
 $compiler->setOptions([
@@ -191,7 +186,23 @@ $compiler->setOptions([
     'sourceMap' => true,
 ]);
 ```
+
+## Advanced options
+
+These options allow controlling additional aspects of Sass compilation.
+
+| Option | Type | Description | Usage example |
+|--------|------|-------------|---------------------|
+| loadPaths | array<string> | Array of paths for searching Sass imports | `['./libs', './node_modules']` |
+| quietDeps | bool | Suppresses warnings from dependencies | `true` |
+| silenceDeprecations | bool | Suppresses warnings about deprecated functions | `true` |
+| verbose | bool | Enables verbose output of messages | `true` |
+
 ```php
-$compiler->compileString($string, ['compressed' => true]);
-$compiler->compileFile($file, ['syntax' => 'sass']);
+$compiler->setOptions([
+    'loadPaths' => ['/path/to/custom/libs'],
+    'quietDeps' => true,
+    'silenceDeprecations' => true,
+    'verbose' => true,
+]);
 ```

@@ -3,6 +3,8 @@
 ![PHP](https://img.shields.io/badge/PHP-^8.2-blue.svg?style=flat)
 [![Coverage Status](https://coveralls.io/repos/github/dragomano/sass-embedded-php/badge.svg?branch=main)](https://coveralls.io/github/dragomano/sass-embedded-php?branch=main)
 
+[English](README.md)
+
 > Создано в исследовательских целях, не для использования на рабочих сайтах!
 
 PHP-обёртка для [sass-embedded](https://www.npmjs.com/package/sass-embedded) (Dart Sass через Node.js).
@@ -120,12 +122,12 @@ use Bugo\Sass\Compiler;
 $compiler = new Compiler();
 
 try {
-    $changed = $compiler->compileFileAndSave(
+    $done = $compiler->compileFileAndSave(
         __DIR__ . '/assets/style.scss',
         __DIR__ . '/assets/style.css'
     );
 
-    if ($changed) {
+    if ($done) {
         echo "CSS перекомпилирован и сохранен.\n";
     } else {
         echo "Изменений не обнаружено, компиляция пропущена.\n";
@@ -149,7 +151,7 @@ $compiler = new Compiler();
 
 $css = $compiler->compileFile(__DIR__ . '/assets/app.scss', [
     'sourceMap' => true,
-    'sourceMapIncludeSources' => true,
+    'includeSources' => true,
     'sourceMapPath' => __DIR__ . '/assets/',
     'style' => 'compressed',
 ]);
@@ -172,15 +174,8 @@ $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 | syntax | string | Синтаксис входного файла | 'scss' для SCSS, 'indented' или 'sass' для SASS |
 | style | string | Стиль вывода | 'compressed' или 'expanded' |
 | sourceMap | bool | Генерировать карту источников | true или false |
-| sourceMapIncludeSources | bool | Включать исходный код в карту | true или false |
+| includeSources | bool | Включать исходный код в карту | true или false |
 | sourceMapPath | string | URL-адрес уже созданной карты или путь для сохранения новой | |
-
-Для некоторых параметров есть альтернативы:
-
-| Параметр | Тип | Описание | Возможные значения |
-|---|---|---|---|
-| compressed | bool | То же, что и 'style' => 'compressed' | true или false |
-| minimize | bool | То же, что и 'style' => 'compressed' | true или false |
 
 Параметры можно включать как для всего компилятора сразу, так и для конкретного метода отдельно:
 
@@ -191,7 +186,23 @@ $compiler->setOptions([
     'sourceMap' => true,
 ]);
 ```
+
+## Расширенные опции
+
+Эти опции позволяют контролировать дополнительные аспекты компиляции Sass.
+
+| Опция | Тип | Описание | Пример использования |
+|--------|------|-------------|---------------------|
+| loadPaths | array<string> | Массив путей для поиска импортов Sass | `['./libs', './node_modules']` |
+| quietDeps | bool | Подавляет предупреждения от зависимостей | `true` |
+| silenceDeprecations | bool | Подавляет предупреждения об устаревших функциях | `true` |
+| verbose | bool | Включает подробный вывод сообщений | `true` |
+
 ```php
-$compiler->compileString($string, ['compressed' => true]);
-$compiler->compileFile($file, ['syntax' => 'sass']);
+$compiler->setOptions([
+    'loadPaths' => ['/path/to/custom/libs'],
+    'quietDeps' => true,
+    'silenceDeprecations' => true,
+    'verbose' => true,
+]);
 ```

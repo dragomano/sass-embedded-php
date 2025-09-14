@@ -38,7 +38,7 @@ it('compiles with sourceMap enabled', function () {
 
     $css = $this->compiler->compileString($scss, [
         'sourceMap' => true,
-        'sourceMapIncludeSources' => true,
+        'includeSources' => true,
     ]);
 
     expect($css)->toMatch('/\/\*# sourceMappingURL=data:application\/json;base64,/')
@@ -63,7 +63,7 @@ it('compiles and saves file with sourceMap next to CSS', function () {
 
     $this->compiler->compileFileAndSave($inputFile, $outputFile, [
         'sourceMap' => true,
-        'sourceMapIncludeSources' => true,
+        'includeSources' => true,
     ]);
 
     expect(file_exists($outputFile))->toBeTrue()
@@ -178,7 +178,7 @@ it('returns the options set via setOptions', function () {
         'syntax' => 'sass',
         'style' => 'compressed',
         'sourceMap' => true,
-        'sourceMapIncludeSources' => true,
+        'includeSources' => true,
     ];
 
     $this->compiler->setOptions($options);

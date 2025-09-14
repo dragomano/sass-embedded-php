@@ -22,12 +22,28 @@ process.stdin.on("end", () => {
       compileOpts.style = 'compressed';
     }
 
-    if (options.sourceMap) {
-      compileOpts.sourceMap = options.sourceMap;
+    if (options.sourceMap || options.sourceMapPath) {
+      compileOpts.sourceMap = options.sourceMapPath || options.sourceMap;
 
-      if (options.sourceMapIncludeSources) {
-        compileOpts.sourceMapIncludeSources = options.sourceMapIncludeSources;
+      if (options.includeSources) {
+        compileOpts.sourceMapIncludeSources = options.includeSources;
       }
+    }
+
+    if (options.loadPaths) {
+      compileOpts.loadPaths = options.loadPaths;
+    }
+
+    if (options.quietDeps) {
+      compileOpts.quietDeps = options.quietDeps;
+    }
+
+    if (options.silenceDeprecations) {
+      compileOpts.silenceDeprecations = options.silenceDeprecations;
+    }
+
+    if (options.verbose) {
+      compileOpts.verbose = options.verbose;
     }
 
     const result = compileString(source, compileOpts);

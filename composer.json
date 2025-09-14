@@ -24,7 +24,8 @@
     "composer/composer": "*",
     "mockery/mockery": "^2.0.x-dev",
     "pestphp/pest": "^3.8",
-    "rector/rector": "^2.0"
+    "rector/rector": "^2.0",
+    "mikey179/vfsstream": "^1.6"
   },
   "autoload": {
     "psr-4": {

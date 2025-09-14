@@ -2,6 +2,7 @@
 
 namespace Bugo\Sass;
 
+use Generator;
 use Symfony\Component\Process\Process;
 
 use function array_merge;
@@ -17,6 +18,7 @@ use function is_dir;
 use function json_decode;
 use function json_encode;
 use function parse_url;
+use function preg_match;
 use function pathinfo;
 use function realpath;
 use function strtolower;
@@ -27,6 +29,10 @@ use function trim;
 class Compiler implements CompilerInterface
 {
     protected array $options = [];
+
+    protected static ?Process $cachedProcess = null;
+
+    protected static ?array $cachedCommand = null;
 
     public function __construct(protected ?string $bridgePath = null, protected ?string $nodePath = null)
     {
@@ -88,8 +94,8 @@ class Compiler implements CompilerInterface
             throw new Exception("Source file not found: $inputPath");
         }
 
-        $inputMtime = filemtime($inputPath);
-        $outputMtime = file_exists($outputPath) ? filemtime($outputPath) : 0;
+        $inputMtime = $this->getFileMtime($inputPath);
+        $outputMtime = file_exists($outputPath) ? $this->getFileMtime($outputPath) : 0;
 
         if ($inputMtime > $outputMtime) {
             if (! empty($options['sourceMap']) && empty($options['sourceMapPath'])) {
@@ -105,6 +111,45 @@ class Compiler implements CompilerInterface
         return false;
     }
 
+    protected function getFileMtime(string $path): int
+    {
+        return filemtime($path);
+    }
+
+    public function compileStringAsGenerator(string $source, array $options = []): Generator
+    {
+        if (trim($source) === '') {
+            yield '';
+            return;
+        }
+
+        $options = array_merge($this->options, $options);
+
+        if (strlen($source) > 1024 * 1024) {
+            $options['streamResult'] = true;
+        }
+
+        $payload = [
+            'source' => $source,
+            'options' => $options,
+            'url' => $options['url'] ?? null,
+        ];
+
+        $result = $this->runCompile($payload);
+
+        if (isset($result['isStreamed']) && $result['isStreamed']) {
+            foreach ($result['chunks'] as $chunk) {
+                yield $chunk;
+            }
+        } else {
+            yield $result['css'] ?? '';
+        }
+
+        if (! empty($result['sourceMap'])) {
+            yield $this->processSourceMap($result['sourceMap'], $options);
+        }
+    }
+
     protected function compileSource(string $source, array $options): string
     {
         $payload = [
@@ -113,14 +158,21 @@ class Compiler implements CompilerInterface
             'url' => $options['url'] ?? null,
         ];
 
-        return $this->runCompile($payload);
+        $data = $this->runCompile($payload);
+        $css = $data['css'] ?? '';
+
+        if (! empty($data['sourceMap'])) {
+            $css .= $this->processSourceMap($data['sourceMap'], $options);
+        }
+
+        return $css;
     }
 
-    protected function runCompile(array $payload): string
+    protected function runCompile(array $payload): array
     {
         $cmd = [$this->nodePath, $this->bridgePath, '--stdin'];
 
-        $process = $this->createProcess($cmd);
+        $process = $this->getOrCreateProcess($cmd);
         $process->setInput(json_encode($payload));
         $process->run();
 
@@ -139,13 +191,7 @@ class Compiler implements CompilerInterface
             throw new Exception('Sass parsing error: ' . $data['error']);
         }
 
-        $css = $data['css'] ?? '';
-
-        if (! empty($data['sourceMap'])) {
-            $css .= $this->processSourceMap($data['sourceMap'], $payload['options']);
-        }
-
-        return $css;
+        return $data;
     }
 
     protected function processSourceMap(array $sourceMap, array $options): string
@@ -159,7 +205,7 @@ class Compiler implements CompilerInterface
 
         $mapFile = (string) $options['sourceMapPath'];
 
-        $isUrl = filter_var($mapFile, FILTER_VALIDATE_URL) !== false;
+        $isUrl = filter_var($mapFile, FILTER_VALIDATE_URL) !== false && preg_match('/^https?:/', $mapFile);
         if ($isUrl) {
             $sourceMappingUrl = $mapFile;
         } else {
@@ -196,6 +242,25 @@ class Compiler implements CompilerInterface
         return file_get_contents($path);
     }
 
+    protected function getOrCreateProcess(array $command): Process
+    {
+        if (self::$cachedProcess !== null && self::$cachedCommand === $command) {
+            if (self::$cachedProcess->isRunning()) {
+                return self::$cachedProcess;
+            }
+
+            self::$cachedProcess = null;
+            self::$cachedCommand = null;
+        }
+
+        $process = $this->createProcess($command);
+
+        self::$cachedProcess = $process;
+        self::$cachedCommand = $command;
+
+        return $process;
+    }
+
     protected function createProcess(array $command): Process
     {
         return new Process($command);
@@ -216,6 +281,7 @@ class Compiler implements CompilerInterface
         foreach ($candidates as $node) {
             $process = $this->createProcess([$node, '--version']);
             $process->run();
+
             if ($process->isSuccessful()) {
                 return $node;
             }

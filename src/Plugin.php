@@ -10,11 +10,20 @@ use Composer\Plugin\PluginInterface;
 
 class Plugin implements PluginInterface, EventSubscriberInterface
 {
-    public function activate(Composer $composer, IOInterface $io): void {}
+    public function activate(Composer $composer, IOInterface $io): void
+    {
+        $io->write('This is the way.');
+    }
 
-    public function deactivate(Composer $composer, IOInterface $io): void {}
+    public function deactivate(Composer $composer, IOInterface $io): void
+    {
+        $io->write('May the Force be with you.');
+    }
 
-    public function uninstall(Composer $composer, IOInterface $io): void {}
+    public function uninstall(Composer $composer, IOInterface $io): void
+    {
+        $io->write('I\'ll see you again. I promise ©️');
+    }
 
     public static function getSubscribedEvents(): array
     {

@@ -13,7 +13,7 @@ function setupCompilerPaths(CompilerInterface $compiler): void
 
     try {
         $reflection->getProperty('nodePath')->setValue($compiler, 'node');
-        $reflection->getProperty('bridgePath')->setValue($compiler, __DIR__ . '/../../bin/bridge.js');
+        $reflection->getProperty('bridgePath')->setValue($compiler, __DIR__ . '/../bin/bridge.js');
     } catch (ReflectionException) {}
 }
 
@@ -22,7 +22,9 @@ function mockProcess(string $expectedCss, ?array $expectedSourceMap = null): Moc
     $mockProcess = Mockery::mock(Process::class);
     $mockProcess->shouldReceive('setInput')->andReturnSelf();
     $mockProcess->shouldReceive('run')->andReturn(0);
-    $mockProcess->shouldReceive('getOutput')->andReturn(json_encode(['css' => $expectedCss, 'sourceMap' => $expectedSourceMap]));
+    $mockProcess->shouldReceive('getOutput')->andReturn(json_encode([
+        'css' => $expectedCss, 'sourceMap' => $expectedSourceMap
+    ]));
     $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
 
     return $mockProcess;
@@ -60,7 +62,13 @@ function generateLargeScss(int $size): string
     return '$large: "' . $largeVariable . '"; body::after { content: $large; }';
 }
 
-function mockProcessForGenerator(string $scss, string $expectedCss, ?array $expectedSourceMap = null, bool $isStreamed = false, array $chunks = []): Process
+function mockProcessForGenerator(
+    string $scss,
+    string $expectedCss,
+    ?array $expectedSourceMap = null,
+    bool $isStreamed = false,
+    array $chunks = []
+): Process
 {
     $mockProcess = Mockery::mock(Process::class);
 
@@ -80,7 +88,14 @@ function mockProcessForGenerator(string $scss, string $expectedCss, ?array $expe
     return $mockProcess;
 }
 
-function compileAndAssertGenerator(string $scss, string $expectedResult, array $options = [], ?array $expectedSourceMap = null, bool $isStreamed = false, array $chunks = []): void
+function compileAndAssertGenerator(
+    string $scss,
+    string $expectedResult,
+    array $options = [],
+    ?array $expectedSourceMap = null,
+    bool $isStreamed = false,
+    array $chunks = []
+): void
 {
     $mockProcess = mockProcessForGenerator($scss, $expectedResult, $expectedSourceMap, $isStreamed, $chunks);
 
@@ -122,9 +137,36 @@ function assertFindNodeReturnsPath(bool $isWindows): void
     $compiler->shouldReceive('isWindows')->andReturn($isWindows);
     $compiler->shouldReceive('createProcess')->andReturn($mockProcess);
 
-    $node = (function() {
-        return $this->findNode();
-    })->call($compiler);
+    $node = (fn() => $this->findNode())->call($compiler);
 
     expect($node)->toBeString();
+}
+
+function mockPersistentProcess(string $expectedCss, bool $withExit = false): Mock|(MockInterface&Process)
+{
+    $mockProcess = Mockery::mock(Process::class);
+    $mockProcess->shouldReceive('start')->once();
+    $mockProcess->shouldReceive('isRunning')->andReturn(true);
+    $mockProcess->shouldReceive('setInput')->once()->andReturnSelf();
+    $mockProcess->shouldReceive('run')->once()->andReturn(0);
+    $mockProcess->shouldReceive('getOutput')->once()->andReturn(json_encode(['css' => $expectedCss]) . "\n");
+    $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
+
+    if ($withExit) {
+        $mockProcess->shouldReceive('setInput')->once()->with(json_encode(['exit' => true]) . "\n")->andReturnSelf();
+        $mockProcess->shouldReceive('run')->once()->andReturn(0);
+        $mockProcess->shouldReceive('stop')->once();
+    }
+
+    return $mockProcess;
+}
+
+function mockPersistentCompiler(Mock|(MockInterface&Process) $mockProcess): Mock|(MockInterface&Compiler)
+{
+    $mockCompiler = mockCompiler();
+    $mockCompiler->shouldReceive('createProcess')->once()->andReturn($mockProcess);
+    $mockCompiler->shouldReceive('checkEnvironment')->andReturnNull();
+    $mockCompiler->shouldReceive('findNode')->andReturn('node');
+
+    return $mockCompiler;
 }

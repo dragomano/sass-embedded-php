@@ -3,11 +3,14 @@
 namespace Bugo\Sass;
 
 use Composer\Composer;
-use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\IO\IOInterface;
-use Composer\Installer\PackageEvent;
-use Composer\Installer\PackageEvents;
 use Composer\Plugin\PluginInterface;
+use Composer\EventDispatcher\EventSubscriberInterface;
+use Composer\Installer\PackageEvent;
+use Composer\Script\Event;
+use Composer\Script\ScriptEvents;
+use Composer\Installer\PackageEvents;
+use RuntimeException;
 use Symfony\Component\Process\Process;
 
 use function copy;
@@ -23,57 +26,69 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 {
     private const PACKAGE_NAME = 'sass-embedded-php';
 
-    private string $packagePath;
+    private string $packagePath = '';
 
-    private string $binDir;
+    private string $binDir = '';
 
     public function activate(Composer $composer, IOInterface $io): void
     {
         $config = $composer->getConfig();
 
-        $this->packagePath = realpath(__DIR__ . '/../');
+        $this->packagePath = (string) realpath(__DIR__ . '/../');
         $this->binDir = (string) $config->get('bin-dir');
     }
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
-    /* @uses onPostPackageUpdate */
+    /* @uses onPackageEvent */
+    /* @uses onScriptEvent */
     public static function getSubscribedEvents(): array
     {
         return [
-            PackageEvents::POST_PACKAGE_INSTALL => 'onPostPackageUpdate',
-            PackageEvents::POST_PACKAGE_UPDATE  => 'onPostPackageUpdate',
+            PackageEvents::POST_PACKAGE_INSTALL => 'onPackageEvent',
+            PackageEvents::POST_PACKAGE_UPDATE  => 'onPackageEvent',
+            ScriptEvents::POST_AUTOLOAD_DUMP    => 'onScriptEvent',
         ];
     }
 
-    public function onPostPackageUpdate(PackageEvent $event): void
+    public function onPackageEvent(PackageEvent $event): void
     {
-        static $alreadyRun = false;
+        $this->ensureInitializedFromComposer($event->getComposer());
+        $this->runInstall($event->getIO());
+    }
 
-        if ($alreadyRun) {
-            return;
+    public function onScriptEvent(Event $event): void
+    {
+        $this->ensureInitializedFromComposer($event->getComposer());
+        $this->runInstall($event->getIO());
+    }
+
+    private function ensureInitializedFromComposer(?Composer $composer): void
+    {
+        if ($this->packagePath === '') {
+            $this->packagePath = (string) realpath(__DIR__ . '/../');
         }
 
-        $alreadyRun = true;
+        if ($composer !== null && $this->binDir === '') {
+            $this->binDir = (string) $composer->getConfig()->get('bin-dir');
+        }
+    }
 
-        $this->installNpm($event->getIO());
-        $this->copyBinary($event->getIO());
+    private function runInstall(IOInterface $io): void
+    {
+        $this->installNpm($io);
+        $this->copyBinary($io);
     }
 
     private function installNpm(IOInterface $io): void
     {
-        if ($this->packagePath === '') {
+        if ($this->packagePath === '' || ! is_dir($this->packagePath)) {
             $io->write(sprintf(
                 '<warning>[%s]</warning> package directory not found, skipping npm install.',
                 self::PACKAGE_NAME
             ));
-
             return;
         }
 
@@ -84,20 +99,31 @@ class Plugin implements PluginInterface, EventSubscriberInterface
                 self::PACKAGE_NAME,
                 $this->packagePath
             ));
-
             return;
         }
 
         $npmBin = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') ? 'npm.cmd' : 'npm';
 
-        $checkNpm = new Process([$npmBin, '--version']);
-        $checkNpm->run();
-        if (! $checkNpm->isSuccessful()) {
+        $check = new Process([$npmBin, '--version']);
+        $check->setTimeout(10);
+
+        try {
+            $check->run();
+        } catch (RuntimeException $e) {
             $io->write(sprintf(
-                '<warning>[%s]</warning> npm not found in PATH, skipping npm install.',
+                '<warning>[%s]</warning> failed to execute "%s --version": %s',
+                self::PACKAGE_NAME,
+                $npmBin,
+                $e->getMessage()
+            ));
+            return;
+        }
+
+        if (! $check->isSuccessful()) {
+            $io->write(sprintf(
+                '<warning>[%s]</warning> npm not found in PATH or not executable, skipping npm install.',
                 self::PACKAGE_NAME
             ));
-
             return;
         }
 
@@ -107,33 +133,49 @@ class Plugin implements PluginInterface, EventSubscriberInterface
                 '<info>[%s]</info> node_modules/sass-embedded already exists, skipping npm install.',
                 self::PACKAGE_NAME
             ));
-
             return;
         }
 
         $process = new Process([$npmBin, 'install'], $this->packagePath);
-        $process->setTimeout(null);
-        $process->run(function ($type, $buffer): void { echo $buffer; });
+        $process->setTimeout(300);
+
+        $io->write(sprintf(
+            '<info>[%s]</info> running "npm install" in %s',
+            self::PACKAGE_NAME, $this->packagePath
+        ));
+
+        $process->run(function (string $type, string $buffer) use ($io): void {
+            $io->write($buffer);
+        });
 
         if ($process->isSuccessful()) {
             $io->write(sprintf(
                 '<info>[%s]</info> npm install completed successfully.',
                 self::PACKAGE_NAME
             ));
-
             return;
         }
 
-        $io->write(sprintf('<error>[%s]</error> npm install failed:', self::PACKAGE_NAME));
+        $io->write(sprintf(
+            '<error>[%s]</error> npm install failed:',
+            self::PACKAGE_NAME
+        ));
+
         $io->write($process->getErrorOutput());
     }
 
     private function copyBinary(IOInterface $io): void
     {
         $source = $this->packagePath . '/bin/bridge.js';
-        $target = $this->binDir . '/bridge.js';
+        $targetDir = rtrim($this->binDir, '/\\');
+        $target = $targetDir . DIRECTORY_SEPARATOR . 'bridge.js';
 
         if (! is_file($source)) {
+            $io->write(sprintf(
+                '<warning>[%s]</warning> binary not found in package (%s), skipping copy.',
+                self::PACKAGE_NAME,
+                $source
+            ));
             return;
         }
 
@@ -142,9 +184,17 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         }
 
         if (@copy($source, $target)) {
-            $io->write(sprintf('<info>[%s]</info> Binary overwritten: %s', self::PACKAGE_NAME, $target));
+            $io->write(sprintf(
+                '<info>[%s]</info> Binary copied: %s',
+                self::PACKAGE_NAME,
+                $target
+            ));
         } else {
-            $io->writeError(sprintf('<error>[%s]</error> Failed to copy binary', self::PACKAGE_NAME));
+            $io->write(sprintf(
+                '<error>[%s]</error> Failed to copy binary to %s',
+                self::PACKAGE_NAME,
+                $target
+            ));
         }
     }
 }

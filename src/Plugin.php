@@ -109,12 +109,12 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
         try {
             $check->run();
-        } catch (RuntimeException $e) {
+        } catch (RuntimeException $runtimeException) {
             $io->write(sprintf(
                 '<warning>[%s]</warning> failed to execute "%s --version": %s',
                 self::PACKAGE_NAME,
                 $npmBin,
-                $e->getMessage()
+                $runtimeException->getMessage()
             ));
             return;
         }

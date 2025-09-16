@@ -148,7 +148,7 @@ function formatResultData(array $data): array
 $scss = generateLargeScss(2000, 4);
 
 // Write SCSS to file in UTF-8
-file_put_contents('generated.scss', $scss, LOCK_EX);
+file_put_contents('examples/generated.scss', $scss, LOCK_EX);
 
 // Display message about SCSS generation
 echo "Generated SCSS saved to generated.scss\n";
@@ -215,8 +215,8 @@ foreach ($compilers as $name => $compilerFactory) {
         $package = str_replace('/', '-', $name);
         $package = str_replace(['(', ')'], ['', ''], $package); // Remove parentheses for filename
         $package = str_replace(' ', '-', $package); // Replace spaces with dashes
-        file_put_contents("result-$package.css", $css, LOCK_EX);
-        $cssSize = filesize("result-$package.css") / 1024;
+        file_put_contents("examples/result-$package.css", $css, LOCK_EX);
+        $cssSize = filesize("examples/result-$package.css") / 1024;
 
         $results[$name] = ['time' => $time, 'size' => $cssSize, 'memory' => $memUsed];
 
@@ -315,7 +315,7 @@ if ($notePos !== false) {
     $mdContent .= $cacheTable;
 }
 
-$scssContent = file_get_contents('generated.scss');
+$scssContent = file_get_contents('examples/generated.scss');
 $mdContent .= "\n## Optimizations Implemented\n\n";
 $mdContent .= "- **Process Caching**: Node.js processes are cached and reused to avoid spawning overhead\n";
 $mdContent .= "- **Streaming for Large Data**: Input data is processed in chunks to prevent memory exhaustion\n";

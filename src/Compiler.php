@@ -26,13 +26,17 @@ use function strtoupper;
 use function substr;
 use function trim;
 
-class Compiler implements CompilerInterface
+class Compiler implements CompilerInterface, PersistentCompilerInterface
 {
     protected array $options = [];
 
     protected static ?Process $cachedProcess = null;
 
     protected static ?array $cachedCommand = null;
+
+    protected bool $persistentMode = false;
+
+    protected ?Process $persistentProcess = null;
 
     public function __construct(protected ?string $bridgePath = null, protected ?string $nodePath = null)
     {
@@ -111,11 +115,6 @@ class Compiler implements CompilerInterface
         return false;
     }
 
-    protected function getFileMtime(string $path): int
-    {
-        return filemtime($path);
-    }
-
     public function compileStringAsGenerator(string $source, array $options = []): Generator
     {
         if (trim($source) === '') {
@@ -150,6 +149,41 @@ class Compiler implements CompilerInterface
         }
     }
 
+    public function compileInPersistentMode(string $source, array $options = []): string
+    {
+        if (trim($source) === '') {
+            return '';
+        }
+
+        $options = array_merge($this->options, $options);
+
+        return $this->compileSourceWithPersistent($source, $options);
+    }
+
+    public function enablePersistentMode(): static
+    {
+        $this->persistentMode = true;
+
+        return $this;
+    }
+
+    public function exitPersistentMode(): void
+    {
+        if ($this->persistentProcess !== null && $this->persistentProcess->isRunning()) {
+            $this->persistentProcess->setInput(json_encode(['exit' => true]) . "\n");
+            $this->persistentProcess->run();
+            $this->persistentProcess->stop();
+        }
+
+        $this->persistentProcess = null;
+        $this->persistentMode = false;
+    }
+
+    protected function getFileMtime(string $path): int
+    {
+        return filemtime($path);
+    }
+
     protected function compileSource(string $source, array $options): string
     {
         $payload = [
@@ -166,6 +200,48 @@ class Compiler implements CompilerInterface
         }
 
         return $css;
+    }
+
+    protected function compileSourceWithPersistent(string $source, array $options): string
+    {
+        $payload = [
+            'source' => $source,
+            'options' => $options,
+            'url' => $options['url'] ?? null,
+        ];
+
+        $data = $this->runCompilePersistent($payload);
+        $css = $data['css'] ?? '';
+
+        if (! empty($data['sourceMap'])) {
+            $css .= $this->processSourceMap($data['sourceMap'], $options);
+        }
+
+        return $css;
+    }
+
+    protected function runCompilePersistent(array $payload): array
+    {
+        $process = $this->getOrCreatePersistentProcess();
+        $process->setInput(json_encode($payload) . "\n");
+        $process->run();
+
+        $out = trim($process->getOutput());
+        if ($out === '') {
+            $err = trim($process->getErrorOutput());
+            throw new Exception('Sass persistent process failed: ' . ($err ?: 'unknown error'));
+        }
+
+        $data = json_decode($out, true);
+        if (! is_array($data)) {
+            throw new Exception('Invalid response from sass persistent bridge');
+        }
+
+        if (! empty($data['error'])) {
+            throw new Exception('Sass parsing error: ' . $data['error']);
+        }
+
+        return $data;
     }
 
     protected function runCompile(array $payload): array
@@ -264,6 +340,19 @@ class Compiler implements CompilerInterface
     protected function createProcess(array $command): Process
     {
         return new Process($command);
+    }
+
+    protected function getOrCreatePersistentProcess(): Process
+    {
+        if ($this->persistentProcess !== null && $this->persistentProcess->isRunning()) {
+            return $this->persistentProcess;
+        }
+
+        $cmd = [$this->nodePath, $this->bridgePath, '--persistent'];
+        $this->persistentProcess = $this->createProcess($cmd);
+        $this->persistentProcess->start();
+
+        return $this->persistentProcess;
     }
 
     protected function findNode(): string

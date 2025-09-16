@@ -2,6 +2,8 @@
 
 namespace Bugo\Sass;
 
+use Generator;
+
 interface CompilerInterface
 {
     public function setOptions(array $options): static;
@@ -13,4 +15,6 @@ interface CompilerInterface
     public function compileFile(string $filePath, array $options = []): string;
 
     public function compileFileAndSave(string $inputPath, string $outputPath, array $options = []): bool;
+
+    public function compileStringAsGenerator(string $source, array $options = []): Generator;
 }

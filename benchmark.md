@@ -1,15 +1,15 @@
 ## Results
 
-| Compiler | Time (sec) | CSS Size (KB) | Memory (MB) |
-|------------|-------------|---------------|-------------|
-| bugo/sass-embedded-php | 1.6589 | 3,559.68 | 28.00 |
-| bugo/sass-embedded-php (optimized) | 1.4491 | 3,559.68 | 2.00 |
+| Compiler                           | Time (sec) | CSS Size (KB) | Memory (MB) |
+|------------------------------------|------------|---------------|-------------|
+| bugo/sass-embedded-php             | 1.4758     | 3,559.77      | 28.00       |
+| bugo/sass-embedded-php (optimized) | 1.4530     | 3,559.77      | 2.00        |
 
-## Process Caching Performance (5 iterations)
-| Compiler | Avg Time (sec) | Avg Memory (MB) |
-|------------|----------------|----------------|
-| bugo/sass-embedded-php | 1.4511 | 0.80 |
-| bugo/sass-embedded-php (optimized) | 1.4509 | 0.00 |
+## Process Caching Performance (25 iterations)
+| Compiler                           | Avg Time (sec) | Avg Memory (MB) |
+|------------------------------------|----------------|-----------------|
+| bugo/sass-embedded-php             | 1.4608         | 0.16            |
+| bugo/sass-embedded-php (optimized) | 1.4679         | 0.00            |
 
 ## Optimizations Implemented
 

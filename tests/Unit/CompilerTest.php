@@ -609,7 +609,7 @@ it('exits persistent mode properly', function () {
     $result = $compiler->compileInPersistentMode($scss);
     expect($result)->toBe($expectedCss);
 
-    $compiler->exitPersistentMode();
+    $compiler->disablePersistentMode();
 });
 
 it('throws exception on error in persistent mode', function () {

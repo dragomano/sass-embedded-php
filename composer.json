@@ -1,6 +1,6 @@
 {
   "name": "bugo/sass-embedded-php",
-  "description": "A lightweight PHP bridge for the official Node.js Sass embedded package, which allows for quick compilation of SCSS and SASS files with full support for Dart Sass features, including source maps and advanced syntax parsing",
+  "description": "A lightweight PHP bridge for the official Node.js Sass embedded package",
   "type": "composer-plugin",
   "license": "MIT",
   "authors": [

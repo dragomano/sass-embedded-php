@@ -83,7 +83,7 @@ SCSS;
 
 $css = $compiler->compileString($scss, [
     'compressed' => true,
-    'sourceMap' => true
+    'sourceMap' => true,
 ]);
 
 echo $css;
@@ -124,7 +124,7 @@ $compiler = new Compiler();
 try {
     $done = $compiler->compileFileAndSave(
         __DIR__ . '/assets/style.scss',
-        __DIR__ . '/assets/style.css'
+        __DIR__ . '/assets/style.css',
     );
 
     if ($done) {
@@ -169,13 +169,13 @@ Paths to bridge.js and Node are specified only through the constructor:
 $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 ```
 
-| Option | Type | Description | Possible values |
-|--------|------|-------------|-----------------|
-| syntax | string | Input syntax | 'scss' for SCSS, 'indented' or 'sass' for SASS |
-| style | string | Output style | 'compressed' or 'expanded' |
-| sourceMap | bool | Generate source map | true or false |
-| includeSources | bool | Include source code in map | true or false |
-| sourceMapPath | string | URL to existing map or path for saving new |  |
+| Option         | Type   | Description                                | Possible values                                |
+|----------------|--------|--------------------------------------------|------------------------------------------------|
+| syntax         | string | Input syntax                               | 'scss' for SCSS, 'indented' or 'sass' for SASS |
+| style          | string | Output style                               | 'compressed' or 'expanded'                     |
+| sourceMap      | bool   | Generate source map                        | true or false                                  |
+| includeSources | bool   | Include source code in map                 | true or false                                  |
+| sourceMapPath  | string | URL to existing map or path for saving new |                                                |
 
 Options can be set either for the entire compiler at once or for a specific method separately:
 
@@ -191,12 +191,12 @@ $compiler->setOptions([
 
 These options allow controlling additional aspects of Sass compilation.
 
-| Option | Type | Description | Usage example |
-|--------|------|-------------|---------------------|
-| loadPaths | array<string> | Array of paths for searching Sass imports | `['./libs', './node_modules']` |
-| quietDeps | bool | Suppresses warnings from dependencies | `true` |
-| silenceDeprecations | bool | Suppresses warnings about deprecated functions | `true` |
-| verbose | bool | Enables verbose output of messages | `true` |
+| Option              | Type          | Description                                    | Usage example                  |
+|---------------------|---------------|------------------------------------------------|--------------------------------|
+| loadPaths           | array<string> | Array of paths for searching Sass imports      | `['./libs', './node_modules']` |
+| quietDeps           | bool          | Suppresses warnings from dependencies          | `true`                         |
+| silenceDeprecations | bool          | Suppresses warnings about deprecated functions | `true`                         |
+| verbose             | bool          | Enables verbose output of messages             | `true`                         |
 
 ```php
 $compiler->setOptions([

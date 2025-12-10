@@ -78,6 +78,14 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
     private function runInstall(IOInterface $io): void
     {
+        static $alreadyRun = false;
+
+        if ($alreadyRun) {
+            return;
+        }
+
+        $alreadyRun = true;
+
         $this->installNpm($io);
         $this->copyBinary($io);
     }

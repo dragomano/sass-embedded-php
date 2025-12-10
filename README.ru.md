@@ -83,7 +83,7 @@ SCSS;
 
 $css = $compiler->compileString($scss, [
     'compressed' => true,
-    'sourceMap' => true
+    'sourceMap' => true,
 ]);
 
 echo $css;
@@ -124,7 +124,7 @@ $compiler = new Compiler();
 try {
     $done = $compiler->compileFileAndSave(
         __DIR__ . '/assets/style.scss',
-        __DIR__ . '/assets/style.css'
+        __DIR__ . '/assets/style.css',
     );
 
     if ($done) {

@@ -162,7 +162,7 @@ $compilers = [
             'sourceMap' => true,
             'sourceFile' => 'generated.scss',
             'sourceMapPath' => 'result.css.map',
-            'includeSources' => true
+            'includeSources' => true,
         ]);
 
         return $compiler;
@@ -174,7 +174,7 @@ $compilers = [
             'sourceFile' => 'generated.scss',
             'sourceMapPath' => 'result-optimized.css.map',
             'includeSources' => true,
-            'streamResult' => true // Enable streaming for large results
+            'streamResult' => true, // Enable streaming for large results
         ]);
 
         return $compiler;
@@ -234,7 +234,7 @@ echo PHP_EOL . '## Performance Comparison with Process Caching' . PHP_EOL;
 // Test process caching performance
 echo "Testing process caching with multiple compilations..." . PHP_EOL;
 
-$numIterations = 5;
+$numIterations = 25;
 $cacheTestResults = [];
 
 foreach ($compilers as $name => $compilerFactory) {
@@ -267,7 +267,7 @@ foreach ($compilers as $name => $compilerFactory) {
     $cacheTestResults[$name] = [
         'avg_time' => $avgTime,
         'avg_memory' => $avgMemory,
-        'iterations' => $numIterations
+        'iterations' => $numIterations,
     ];
 
     echo "Cached Compiler: $name, Avg Time: " . (is_numeric($avgTime) ? number_format($avgTime, 4) : $avgTime) . " sec, Avg Memory: " . (is_numeric($avgMemory) ? number_format($avgMemory, 2) : $avgMemory) . " MB" . PHP_EOL;
@@ -288,7 +288,7 @@ $mdContent = file_get_contents('benchmark.md');
 // Add caching test results to markdown
 $cacheTable = PHP_EOL . '## Process Caching Performance (' . $numIterations . ' iterations)' . PHP_EOL;
 $cacheTable .= '| Compiler | Avg Time (sec) | Avg Memory (MB) |' . PHP_EOL;
-$cacheTable .= '|------------|----------------|----------------|' . PHP_EOL;
+$cacheTable .= '|----------|----------------|-----------------|' . PHP_EOL;
 
 foreach ($cacheTestResults as $name => $data) {
     $timeStr = is_numeric($data['avg_time']) ? number_format($data['avg_time'], 4) : $data['avg_time'];
@@ -299,10 +299,11 @@ foreach ($cacheTestResults as $name => $data) {
 $tableStart = strpos($mdContent, '| Compiler');
 $tableOld = substr($mdContent, $tableStart);
 
-$newTable = "| Compiler | Time (sec) | CSS Size (KB) | Memory (MB) |\n|------------|-------------|---------------|-------------|\n";
+$newTable = '| Compiler | Time (sec) | CSS Size (KB) | Memory (MB) |' . PHP_EOL;
+$newTable .= '|---------|------------|---------------|-------------|' . PHP_EOL;
 foreach ($results as $name => $data) {
     $formatted = formatResultData($data);
-    $newTable .= "| $name | {$formatted['time']} | {$formatted['size']} | {$formatted['memory']} |\n";
+    $newTable .= "| $name | {$formatted['time']} | {$formatted['size']} | {$formatted['memory']} |" . PHP_EOL;
 }
 
 $mdContent = str_replace($tableOld, $newTable, $mdContent);

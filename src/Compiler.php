@@ -13,7 +13,6 @@ use function file_get_contents;
 use function file_put_contents;
 use function filemtime;
 use function filter_var;
-use function is_array;
 use function is_dir;
 use function json_decode;
 use function json_encode;
@@ -37,6 +36,10 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     protected bool $persistentMode = false;
 
     protected ?Process $persistentProcess = null;
+
+    private const STREAM_THRESHOLD = 1024 * 1024;
+
+    private const DEFAULT_FILENAME = 'style';
 
     public function __construct(protected ?string $bridgePath = null, protected ?string $nodePath = null)
     {
@@ -124,16 +127,11 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
 
         $options = array_merge($this->options, $options);
 
-        if (strlen($source) > 1024 * 1024) {
+        if (strlen($source) > self::STREAM_THRESHOLD) {
             $options['streamResult'] = true;
         }
 
-        $payload = [
-            'source' => $source,
-            'options' => $options,
-            'url' => $options['url'] ?? null,
-        ];
-
+        $payload = $this->preparePayload($source, $options);
         $result = $this->runCompile($payload);
 
         if (isset($result['isStreamed']) && $result['isStreamed']) {
@@ -157,7 +155,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
 
         $options = array_merge($this->options, $options);
 
-        return $this->compileSourceWithPersistent($source, $options);
+        return $this->compileSource($source, $options, true);
     }
 
     public function enablePersistentMode(): static
@@ -167,7 +165,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         return $this;
     }
 
-    public function exitPersistentMode(): void
+    public function disablePersistentMode(): void
     {
         if ($this->persistentProcess !== null && $this->persistentProcess->isRunning()) {
             $this->persistentProcess->setInput(json_encode(['exit' => true]) . "\n");
@@ -184,33 +182,25 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         return filemtime($path);
     }
 
-    protected function compileSource(string $source, array $options): string
+    protected function compileSource(string $source, array $options, bool $persistent = false): string
     {
-        $payload = [
-            'source' => $source,
-            'options' => $options,
-            'url' => $options['url'] ?? null,
-        ];
+        $payload = $this->preparePayload($source, $options);
+        $data = $persistent ? $this->runCompilePersistent($payload) : $this->runCompile($payload);
 
-        $data = $this->runCompile($payload);
-        $css = $data['css'] ?? '';
-
-        if (! empty($data['sourceMap'])) {
-            $css .= $this->processSourceMap($data['sourceMap'], $options);
-        }
-
-        return $css;
+        return $this->buildCssWithSourceMap($data, $options);
     }
 
-    protected function compileSourceWithPersistent(string $source, array $options): string
+    protected function preparePayload(string $source, array $options): array
     {
-        $payload = [
+        return [
             'source' => $source,
             'options' => $options,
             'url' => $options['url'] ?? null,
         ];
+    }
 
-        $data = $this->runCompilePersistent($payload);
+    protected function buildCssWithSourceMap(array $data, array $options): string
+    {
         $css = $data['css'] ?? '';
 
         if (! empty($data['sourceMap'])) {
@@ -226,41 +216,32 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         $process->setInput(json_encode($payload) . "\n");
         $process->run();
 
-        $out = trim($process->getOutput());
-        if ($out === '') {
-            $err = trim($process->getErrorOutput());
-            throw new Exception('Sass persistent process failed: ' . ($err ?: 'unknown error'));
-        }
-
-        $data = json_decode($out, true);
-        if (! is_array($data)) {
-            throw new Exception('Invalid response from sass persistent bridge');
-        }
-
-        if (! empty($data['error'])) {
-            throw new Exception('Sass parsing error: ' . $data['error']);
-        }
-
-        return $data;
+        return $this->parseProcessOutput($process, 'persistent');
     }
 
     protected function runCompile(array $payload): array
     {
         $cmd = [$this->nodePath, $this->bridgePath, '--stdin'];
-
         $process = $this->getOrCreateProcess($cmd);
         $process->setInput(json_encode($payload));
         $process->run();
 
+        return $this->parseProcessOutput($process, 'standard');
+    }
+
+    protected function parseProcessOutput(Process $process, string $mode): array
+    {
         $out = trim($process->getOutput());
         if ($out === '') {
             $err = trim($process->getErrorOutput());
-            throw new Exception('Sass process failed: ' . ($err ?: 'unknown error'));
+            $errorType = $mode === 'persistent' ? 'persistent process' : 'process';
+            throw new Exception("Sass $errorType failed: " . ($err ?: 'unknown error'));
         }
 
         $data = json_decode($out, true);
-        if (! is_array($data)) {
-            throw new Exception('Invalid response from sass bridge');
+        if ($data === null) {
+            $errorType = $mode === 'persistent' ? 'persistent bridge' : 'bridge';
+            throw new Exception("Invalid response from sass $errorType");
         }
 
         if (! empty($data['error'])) {
@@ -273,28 +254,38 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     protected function processSourceMap(array $sourceMap, array $options): string
     {
         if (empty($options['sourceMapPath'])) {
-            $mapData = json_encode($sourceMap);
-            $encodedMap = base64_encode($mapData);
-
-            return "\n/*# sourceMappingURL=data:application/json;base64," . $encodedMap . " */";
+            return $this->inlineSourceMap($sourceMap);
         }
 
+        return $this->fileSourceMap($sourceMap, $options);
+    }
+
+    protected function inlineSourceMap(array $sourceMap): string
+    {
+        $mapData = json_encode($sourceMap);
+        $encodedMap = base64_encode($mapData);
+
+        return "\n/*# sourceMappingURL=data:application/json;base64," . $encodedMap . " */";
+    }
+
+    protected function fileSourceMap(array $sourceMap, array $options): string
+    {
         $mapFile = (string) $options['sourceMapPath'];
 
         $isUrl = filter_var($mapFile, FILTER_VALIDATE_URL) !== false && preg_match('/^https?:/', $mapFile);
         if ($isUrl) {
-            $sourceMappingUrl = $mapFile;
-        } else {
-            if (is_dir($mapFile)) {
-                $sourceFilename = $this->getSourceFilenameFromUrl($options['url'] ?? '');
-                $mapFile .= DIRECTORY_SEPARATOR . $sourceFilename . '.map';
-            } elseif (strtolower(substr($mapFile, -4)) !== '.map') {
-                $mapFile .= '.map';
-            }
-
-            file_put_contents($mapFile, json_encode($sourceMap));
-            $sourceMappingUrl = basename($mapFile);
+            return "\n/*# sourceMappingURL=" . $mapFile . " */";
         }
+
+        if (is_dir($mapFile)) {
+            $sourceFilename = $this->getSourceFilenameFromUrl($options['url'] ?? '');
+            $mapFile .= DIRECTORY_SEPARATOR . $sourceFilename . '.map';
+        } elseif (strtolower(substr($mapFile, -4)) !== '.map') {
+            $mapFile .= '.map';
+        }
+
+        file_put_contents($mapFile, json_encode($sourceMap));
+        $sourceMappingUrl = basename($mapFile);
 
         return "\n/*# sourceMappingURL=" . $sourceMappingUrl . " */";
     }
@@ -302,7 +293,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     protected function getSourceFilenameFromUrl(string $url): string
     {
         if ($url === '') {
-            return 'style';
+            return self::DEFAULT_FILENAME;
         }
 
         $parsed = parse_url($url);
@@ -310,7 +301,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         $basename = basename($path);
         $info = pathinfo($basename);
 
-        return $info['filename'] ?: 'style';
+        return $info['filename'] ?: self::DEFAULT_FILENAME;
     }
 
     protected function readFile(string $path): string|false

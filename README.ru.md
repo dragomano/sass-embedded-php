@@ -206,7 +206,3 @@ $compiler->setOptions([
     'verbose' => true,
 ]);
 ```
-
-## Бенчмарки
-
-Смотрите файл [benchmark.md](benchmark.md) для просмотра результатов производительности.

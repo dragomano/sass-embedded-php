@@ -206,7 +206,3 @@ $compiler->setOptions([
     'verbose' => true,
 ]);
 ```
-
-## Benchmarks
-
-See the [benchmark.md](benchmark.md) file for performance benchmarks.

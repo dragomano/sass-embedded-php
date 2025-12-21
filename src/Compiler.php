@@ -370,7 +370,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
 
         throw new Exception(implode('', [
             'Node.js not found. ',
-            'Please install Node.js >= 18 and make sure it\'s in PATH, ',
+            "Please install Node.js >= 18 and make sure it's in PATH, ",
             'or pass its full path to your Compiler constructor.',
         ]));
     }

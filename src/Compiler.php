@@ -13,6 +13,7 @@ use function file_get_contents;
 use function file_put_contents;
 use function filemtime;
 use function filter_var;
+use function implode;
 use function is_dir;
 use function json_decode;
 use function json_encode;
@@ -193,9 +194,9 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     protected function preparePayload(string $source, array $options): array
     {
         return [
-            'source' => $source,
+            'source'  => $source,
             'options' => $options,
-            'url' => $options['url'] ?? null,
+            'url'     => $options['url'] ?? null,
         ];
     }
 
@@ -367,10 +368,11 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             }
         }
 
-        throw new Exception(
-            "Node.js not found. Please install Node.js >= 18 and make sure it's in PATH, " .
-            "or pass its full path to your Compiler constructor."
-        );
+        throw new Exception(implode('', [
+            'Node.js not found. ',
+            'Please install Node.js >= 18 and make sure it\'s in PATH, ',
+            'or pass its full path to your Compiler constructor.',
+        ]));
     }
 
     protected function isWindows(): bool

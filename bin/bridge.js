@@ -106,6 +106,52 @@ function processPersistentMode() {
 }
 
 /**
+ * Normalizes sourceMap format for consistent output
+ */
+function normalizeSourceMap(sourceMap, options) {
+  if (!sourceMap) return sourceMap;
+
+  const map = typeof sourceMap === 'string' ? JSON.parse(sourceMap) : sourceMap;
+
+  // If sources is data URI, extract content and set sources to filename
+  if (map.sources && map.sources.length > 0) {
+    const sources = [];
+    const sourcesContent = [];
+
+    for (let i = 0; i < map.sources.length; i++) {
+      const source = map.sources[i];
+
+      if (source.startsWith('data:')) {
+        // Extract content from data URI
+        const commaIndex = source.indexOf(',');
+        const encodedContent = source.substring(commaIndex + 1);
+        const content = decodeURIComponent(encodedContent);
+
+        sourcesContent.push(content);
+
+        // Use sourceFile from options or default
+        sources.push(options.sourceFile || 'input.scss');
+      } else {
+        sources.push(source);
+
+        if (map.sourcesContent && map.sourcesContent[i]) {
+          sourcesContent.push(map.sourcesContent[i]);
+        }
+      }
+    }
+
+    map.sources = sources;
+    if (sourcesContent.length > 0) {
+      map.sourcesContent = sourcesContent;
+    } else if (!('includeSources' in options) || options.includeSources === false) {
+      delete map.sourcesContent;
+    }
+  }
+
+  return map;
+}
+
+/**
  * Compiles a single payload and returns the response object
  */
 function compilePayload(payload) {
@@ -154,7 +200,7 @@ function compilePayload(payload) {
 
   const response = {
     css: result.css,
-    ...(result.sourceMap && { sourceMap: result.sourceMap }),
+    ...(result.sourceMap && { sourceMap: normalizeSourceMap(result.sourceMap, options) }),
   };
 
   // Check if streaming mode is requested for large results

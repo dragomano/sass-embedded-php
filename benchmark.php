@@ -224,8 +224,6 @@ foreach ($compilers as $name => $compilerFactory) {
         $cssSize = filesize($cssFileName) / 1024;
 
         $results[$name] = ['time' => $time, 'size' => $cssSize, 'memory' => $memUsed];
-
-        echo "Compiler: $name, Time: " . number_format($time, 4) . " sec (avg of $runs runs), Size: " . number_format($cssSize, 2) . " KB" . PHP_EOL;
     } catch (Exception $e) {
         echo "General error in $name: " . $e->getMessage() . PHP_EOL;
         $results[$name] = ['time' => 'Error', 'size' => 'N/A', 'memory' => 'N/A'];

@@ -26,6 +26,9 @@ use function strtoupper;
 use function substr;
 use function trim;
 
+use const DIRECTORY_SEPARATOR;
+use const FILTER_VALIDATE_URL;
+
 class Compiler implements CompilerInterface, PersistentCompilerInterface
 {
     protected array $options = [];
@@ -202,7 +205,11 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
 
     protected function buildCssWithSourceMap(array $data, array $options): string
     {
-        $css = $data['css'] ?? '';
+        if (isset($data['isStreamed']) && $data['isStreamed'] && isset($data['chunks'])) {
+            $css = implode('', $data['chunks']);
+        } else {
+            $css = $data['css'] ?? '';
+        }
 
         if (! empty($data['sourceMap'])) {
             $css .= $this->processSourceMap($data['sourceMap'], $options);

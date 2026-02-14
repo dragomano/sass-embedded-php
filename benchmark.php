@@ -140,6 +140,18 @@ echo "Generated SCSS saved to generated.scss\n";
 echo "SCSS size: " . strlen($scss) . " bytes\n";
 
 $compilers = [
+    'bugo/sass-embedded-php' => function() {
+        $compiler = new EmbeddedCompiler();
+        $compiler->setOptions([
+            'style'         => 'compressed',
+            'sourceMap'     => true,
+            'sourceFile'    => 'generated.scss',
+            'sourceMapPath' => 'result-sass-embedded-php.css.map',
+            'streamResult'  => false,
+        ]);
+
+        return $compiler;
+    },
     'bugo/sass-embedded-php-generator' => function() {
         $compiler = new EmbeddedCompiler();
         $compiler->setOptions([
@@ -147,18 +159,6 @@ $compilers = [
             'sourceMap'     => true,
             'sourceFile'    => 'generated.scss',
             'sourceMapPath' => 'result-sass-embedded-php-generator.css.map',
-            'streamResult'  => true,
-        ]);
-
-        return $compiler;
-    },
-    'bugo/sass-embedded-php-debug' => function() {
-        $compiler = new EmbeddedCompiler();
-        $compiler->setOptions([
-            'style'         => 'compressed',
-            'sourceMap'     => true,
-            'sourceFile'    => 'generated.scss',
-            'sourceMapPath' => 'result-sass-embedded-php.css.map',
             'streamResult'  => true,
         ]);
 
@@ -188,11 +188,7 @@ foreach ($compilers as $name => $compilerFactory) {
             $start = hrtime(true);
             $compiler = $compilerFactory();
 
-            if ($name === 'bugo/sass-embedded-php-generator') {
-                $css = implode('', iterator_to_array($compiler->compileStringAsGenerator($scss)));
-            } else {
-                $css = $compiler->compileString($scss);
-            }
+            $css = $compiler->compileString($scss);
 
             if ($i === 0 && file_exists($cssMap)) {
                 $map = file_get_contents($cssMap);
@@ -252,24 +248,34 @@ $mdContent  = file_get_contents('benchmark.md');
 if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
     exec('cmd /c ver', $output);
     $verOutput = implode("\n", $output);
+
     if (preg_match('/\[Version ([\d.]+)]/', $verOutput, $matches)) {
         $build = $matches[1];
-        $buildNum = (int)explode('.', $build)[2];
+        $buildNum = (int) explode('.', $build)[2];
+
         if ($buildNum >= 22000) {
             $os = 'Windows 11';
         } else {
             $os = 'Windows 10';
         }
+
         // Determine release version
-        if ($buildNum >= 26100) {
+        if ($buildNum >= 28000) {
+            $release = '26H1';
+        } elseif ($buildNum >= 26200) {
+            $release = '25H2';
+        } elseif ($buildNum >= 26100) {
             $release = '24H2';
-        } elseif ($buildNum >= 22621) {
+        } elseif ($buildNum >= 22631) {
             $release = '23H2';
+        } elseif ($buildNum >= 22621) {
+            $release = '22H2';
         } elseif ($buildNum >= 22000) {
             $release = '21H2';
         } else {
             $release = 'Unknown';
         }
+
         $os .= ' ' . $release . ' (Build ' . $build . ')';
     } else {
         $os = php_uname('s') . ' ' . php_uname('r');

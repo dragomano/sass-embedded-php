@@ -5,9 +5,7 @@
 
 [English](README.md)
 
-> Создано в исследовательских целях, не для использования на рабочих сайтах!
-
-PHP-обёртка для [sass-embedded](https://www.npmjs.com/package/sass-embedded) (Dart Sass через Node.js).
+PHP-обёртка для [sass-embedded](https://npmx.dev/package/sass-embedded) (Dart Sass через Node.js).
 
 Позволяет компилировать SCSS/SASS в CSS через PHP, используя Node.js и npm.
 

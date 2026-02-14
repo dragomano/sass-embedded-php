@@ -5,9 +5,7 @@
 
 [По-русски](README.ru.md)
 
-> Created for research purposes, not for use on production sites!
-
-PHP wrapper for [sass-embedded](https://www.npmjs.com/package/sass-embedded) (Dart Sass via Node.js).
+PHP wrapper for [sass-embedded](https://npmx.dev/package/sass-embedded) (Dart Sass via Node.js).
 
 Allows compiling SCSS/SASS to CSS through PHP using Node.js and npm.
 

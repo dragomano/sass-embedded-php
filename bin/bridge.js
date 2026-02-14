@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import {compileString} from "sass-embedded";
+import {transform} from "lightningcss";
+import postcss from "postcss";
 import readline from "readline";
 
 /**
@@ -151,6 +153,95 @@ function normalizeSourceMap(sourceMap, options) {
   return map;
 }
 
+function optimizeCss(css, sourceMap, options, minify = false) {
+  const filename = options.sourceFile || 'style.css';
+
+  try {
+    const transformOptions = {
+      filename,
+      code: Buffer.from(css),
+      minify: Boolean(minify),
+      sourceMap: Boolean(sourceMap),
+    };
+
+    if (sourceMap) {
+      transformOptions.inputSourceMap = JSON.stringify(sourceMap);
+    }
+
+    const optimized = transform(transformOptions);
+    const optimizedCss = Buffer.from(optimized.code).toString('utf8');
+
+    let optimizedMap = sourceMap;
+    if (sourceMap && optimized.map) {
+      optimizedMap = JSON.parse(Buffer.from(optimized.map).toString('utf8'));
+    }
+
+    return { css: optimizedCss, sourceMap: optimizedMap };
+  } catch (error) {
+    throw new Error(`Lightning CSS optimization failed: ${error?.message || error}`);
+  }
+}
+
+function dedupeOverriddenDeclarations(css) {
+  const root = postcss.parse(css);
+  dedupeInContainer(root);
+
+  return root.toString();
+}
+
+function dedupeInContainer(container) {
+  const selectorRules = new Map();
+
+  container.each((node) => {
+    if (node.type === 'rule') {
+      const list = selectorRules.get(node.selector) || [];
+      list.push(node);
+      selectorRules.set(node.selector, list);
+      return;
+    }
+
+    if (node.type === 'atrule' && node.nodes) {
+      dedupeInContainer(node);
+    }
+  });
+
+  for (const rules of selectorRules.values()) {
+    if (rules.length < 2) {
+      continue;
+    }
+
+    const seen = new Set();
+
+    for (let i = rules.length - 1; i >= 0; i--) {
+      const rule = rules[i];
+      const declarations = [];
+
+      rule.each((node) => {
+        if (node.type === 'decl') {
+          declarations.push(node);
+        }
+      });
+
+      for (let j = declarations.length - 1; j >= 0; j--) {
+        const decl = declarations[j];
+        const key = decl.important ? `${decl.prop}!important` : decl.prop;
+
+        if (seen.has(key)) {
+          decl.remove();
+          continue;
+        }
+
+        seen.add(key);
+      }
+
+      const hasDecl = rule.nodes && rule.nodes.some((node) => node.type === 'decl');
+      if (!hasDecl) {
+        rule.remove();
+      }
+    }
+  }
+}
+
 /**
  * Compiles a single payload and returns the response object
  */
@@ -197,15 +288,19 @@ function compilePayload(payload) {
   }
 
   const result = compileString(source, compileOpts);
+  const normalizedSourceMap = result.sourceMap ? normalizeSourceMap(result.sourceMap, options) : undefined;
+  const shouldMinify = options.minimize || ('compressed' in options && options.compressed) || options.style === 'compressed';
+  const optimized = optimizeCss(result.css, normalizedSourceMap, options, shouldMinify);
+  const finalCss = optimized.sourceMap ? optimized.css : dedupeOverriddenDeclarations(optimized.css);
 
   const response = {
-    css: result.css,
-    ...(result.sourceMap && { sourceMap: normalizeSourceMap(result.sourceMap, options) }),
+    css: finalCss,
+    ...(optimized.sourceMap && { sourceMap: optimized.sourceMap }),
   };
 
   // Check if streaming mode is requested for large results
-  if ('streamResult' in options && options.streamResult && result.css.length > 1024 * 1024) {
-    response.chunks = Array.from(cssChunkGenerator(result.css));
+  if ('streamResult' in options && options.streamResult && finalCss.length > 1024 * 1024) {
+    response.chunks = Array.from(cssChunkGenerator(finalCss));
     response.isStreamed = true;
 
     delete response.css;

@@ -95,3 +95,40 @@ it('throws Exception on invalid SCSS string', function () {
     $invalidScss = '$color: red body { color: $color }';
     $this->compiler->compileString($invalidScss);
 })->throws(Exception::class, 'Sass parsing error:');
+
+it('preserves all comments in expanded mode', function () {
+    $scss = <<<'SCSS'
+/* regular comment */
+/*! important comment */
+// single line comment
+.test {
+    color: red;
+}
+SCSS;
+
+    $css = $this->compiler->compileString($scss);
+
+    expect($css)->toContain('/* regular comment */')
+        ->and($css)->toContain('/*! important comment */')
+        ->and($css)->not()->toContain('// single line comment')
+        ->and($css)->toContain('.test {')
+        ->and($css)->toContain('color: red;');
+});
+
+it('preserves only important comments in compressed mode', function () {
+    $scss = <<<'SCSS'
+/* regular comment */
+/*! important comment */
+// single line comment
+.test {
+    color: red;
+}
+SCSS;
+
+    $css = $this->compiler->compileString($scss, ['style' => 'compressed']);
+
+    expect($css)->not()->toContain('/* regular comment */')
+        ->and($css)->not()->toContain('// single line comment')
+        ->and($css)->toContain('/*! important comment */')
+        ->and($css)->toContain('.test{color:red}');
+});

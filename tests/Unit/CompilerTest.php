@@ -13,7 +13,6 @@ beforeEach(function () {
     $reflection->setStaticPropertyValue('cachedCommand', null);
 });
 
-
 it('compiles a SCSS file', function () {
     $files = ['test.scss' => '$color: blue; p { color: $color; }'];
     $root = setupVfs($files);
@@ -29,7 +28,6 @@ it('compiles a SCSS file', function () {
     $css = $mockCompiler->compileFile($file, ['compressed' => true]);
     assertCssEquals($css, $expected);
 });
-
 
 it('compiles and saves file with sourceMap next to CSS', function () {
     $files = ['test_source.scss' => '$color: green; .test { color: $color; }'];
@@ -61,8 +59,6 @@ it('compiles and saves file with sourceMap next to CSS', function () {
     expect($mapContentDecoded)->toHaveKey('sourcesContent')
         ->and($mapContentDecoded['sources'])->toBeArray();
 });
-
-
 
 it('compiles and saves file only if source has changed', function () {
     $scss1 = '$color: red; body { color: $color; }';
@@ -165,7 +161,6 @@ it('throws exception if no node candidate is successful', function () {
         })->call($compiler);
     })->toThrow(Exception::class, 'Node.js not found');
 });
-
 
 it('throws Exception when bridge.js is missing', function () {
     $bridgePath = __DIR__ . '/nonexistent_bridge.js';

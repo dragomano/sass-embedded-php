@@ -21,6 +21,7 @@
     "symfony/process": "^7.4"
   },
   "require-dev": {
+    "bugo/scss-benchmark-utils": "dev-main",
     "composer/composer": "*",
     "mockery/mockery": "^2.0.x-dev",
     "pestphp/pest": "^3.8|^4.2",

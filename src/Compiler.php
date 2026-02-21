@@ -211,8 +211,15 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             $css = $data['css'] ?? '';
         }
 
-        if (! empty($data['sourceMap'])) {
-            $css .= $this->processSourceMap($data['sourceMap'], $options);
+        $sourceMap = $data['sourceMap'] ?? null;
+
+        if (isset($data['sourceMapIsStreamed']) && $data['sourceMapIsStreamed'] && isset($data['sourceMapChunks'])) {
+            $sourceMap = implode('', $data['sourceMapChunks']);
+            $sourceMap = json_decode($sourceMap, true);
+        }
+
+        if (! empty($sourceMap)) {
+            $css .= $this->processSourceMap($sourceMap, $options);
         }
 
         return $css;

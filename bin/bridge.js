@@ -231,10 +231,8 @@ function compilePayload(payload) {
     compileOpts.style = 'compressed';
   }
 
-  const sourceMapPath = 'sourceMapPath' in options && options.sourceMapPath ? options.sourceMapPath : false;
-
-  if (options.sourceMap || sourceMapPath) {
-    compileOpts.sourceMap = sourceMapPath || options.sourceMap;
+  if (options.sourceMap) {
+    compileOpts.sourceMap = options.sourceMap;
 
     if ('includeSources' in options && options.includeSources) {
       compileOpts.sourceMapIncludeSources = options.includeSources;

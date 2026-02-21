@@ -692,3 +692,39 @@ it('resets cached process and command when process is not running', function () 
         ->and($reflection->getStaticPropertyValue('cachedProcess'))->toBe($newMockProcess)
         ->and($reflection->getStaticPropertyValue('cachedCommand'))->toBe($cmd);
 });
+
+it('assembles streamed sourceMap chunks', function () {
+    $scss = '$color: orange; body { color: $color; }';
+    $expectedCss = 'body{color:orange}';
+    $sourceMap = ['version' => 3, 'mappings' => 'AAAA', 'sources' => ['input.scss']];
+    $sourceMapJson = json_encode($sourceMap);
+    $chunkSize = 10;
+    $chunks = [];
+    for ($i = 0; $i < strlen($sourceMapJson); $i += $chunkSize) {
+        $chunks[] = substr($sourceMapJson, $i, $chunkSize);
+    }
+
+    $mockProcess = mock(Process::class);
+    $mockProcess->shouldReceive('setInput')->once()->andReturnSelf();
+    $mockProcess->shouldReceive('run')->once()->andReturn(0);
+    $mockProcess->shouldReceive('getOutput')->once()->andReturn(
+        json_encode([
+            'css' => $expectedCss,
+            'sourceMapChunks' => $chunks,
+            'sourceMapIsStreamed' => true,
+        ])
+    );
+    $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
+
+    $compiler = mockCompiler();
+    $compiler->shouldReceive('createProcess')->andReturn($mockProcess);
+    $compiler->shouldReceive('checkEnvironment')->andReturnNull();
+    $compiler->shouldReceive('findNode')->andReturn('node');
+    $compiler->shouldReceive('processSourceMap')->once()->with($sourceMap, ['sourceMap' => true])->andReturn(
+        "\n/*# sourceMappingURL=data:application/json;base64,encoded */"
+    );
+
+    $result = $compiler->compileString($scss, ['sourceMap' => true]);
+
+    expect($result)->toBe($expectedCss . "\n/*# sourceMappingURL=data:application/json;base64,encoded */");
+});

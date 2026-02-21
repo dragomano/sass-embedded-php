@@ -32,7 +32,7 @@ function mockProcess(string $expectedCss, ?array $expectedSourceMap = null): Moc
 
 function mockCompiler(): Mock|(MockInterface&Compiler)
 {
-    $mockCompiler = Mockery::mock(Compiler::class)->makePartial();
+    $mockCompiler = Mockery::mock(Compiler::class, [null, 'node'])->makePartial();
     $mockCompiler->shouldAllowMockingProtectedMethods();
 
     setupCompilerPaths($mockCompiler);

@@ -15,7 +15,7 @@ echo "SCSS size: " . strlen($scss) . " bytes\n";
 
 $compilers = [
     'bugo/sass-embedded-php' => function() {
-        $compiler = new EmbeddedCompiler();
+        $compiler = new EmbeddedCompiler(nodePath: 'node');
         $compiler->setOptions([
             'style'         => 'compressed',
             'sourceMap'     => true,
@@ -27,7 +27,7 @@ $compilers = [
         return $compiler;
     },
     'bugo/sass-embedded-php-generator' => function() {
-        $compiler = new EmbeddedCompiler();
+        $compiler = new EmbeddedCompiler(nodePath: 'node');
         $compiler->setOptions([
             'style'         => 'compressed',
             'sourceMap'     => true,

@@ -4,7 +4,7 @@ use Bugo\Sass\Compiler;
 use Bugo\Sass\Exception;
 
 beforeEach(function () {
-    $this->compiler = new Compiler();
+    $this->compiler = new Compiler(nodePath: 'node');
 
     $reflection = new ReflectionClass(Compiler::class);
     $reflection->setStaticPropertyValue('cachedProcess', null);

@@ -6,7 +6,7 @@ use Symfony\Component\Process\Process;
 use org\bovigo\vfs\vfsStream;
 
 beforeEach(function () {
-    $this->compiler = new Compiler();
+    $this->compiler = new Compiler(nodePath: 'node');
 
     $reflection = new ReflectionClass(Compiler::class);
     $reflection->setStaticPropertyValue('cachedProcess', null);
@@ -145,6 +145,12 @@ it('returns node path on non-Windows', function () {
     assertFindNodeReturnsPath(false);
 });
 
+it('detects current operating system in isWindows', function () {
+    $isWindows = (fn() => $this->isWindows())->call($this->compiler);
+
+    expect($isWindows)->toBe(PHP_OS_FAMILY === 'Windows');
+});
+
 it('throws exception if no node candidate is successful', function () {
     $mockProcess = mock(Process::class);
     $mockProcess->shouldReceive('run')->atLeast()->andReturn(0);
@@ -164,7 +170,7 @@ it('throws exception if no node candidate is successful', function () {
 
 it('throws Exception when bridge.js is missing', function () {
     $bridgePath = __DIR__ . '/nonexistent_bridge.js';
-    $compiler = new Compiler($bridgePath);
+    $compiler = new Compiler($bridgePath, 'node');
     $compiler->compileString('$color: red;');
 })->throws(Exception::class);
 
@@ -232,7 +238,7 @@ it('throws Exception if sass-embedded folder does not exist', function () {
     $this->expectException(Exception::class);
     $this->expectExceptionMessage("sass-embedded not found. Run `npm install` in $fakePackageRoot.");
 
-    $compiler->__construct();
+    $compiler->__construct(nodePath: 'node');
 });
 
 it('throws Exception when input file does not exist in compileFileAndSave', function () {
@@ -589,7 +595,7 @@ it('throws exception on error in persistent mode', function () {
 });
 
 it('returns empty css for empty string in persistent mode', function () {
-    $compiler = new Compiler();
+    $compiler = new Compiler(nodePath: 'node');
     $compiler->enablePersistentMode();
 
     $result = $compiler->compileInPersistentMode('');

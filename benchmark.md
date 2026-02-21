@@ -9,9 +9,9 @@
 
 ## Results
 
-| Compiler                         | Time (sec) | CSS Size (KB) | Memory (MB) |
-|----------------------------------|------------|---------------|-------------|
-| bugo/sass-embedded-php           | 0.9246     | 779.81        | 0.76        |
-| bugo/sass-embedded-php-generator | 0.8143     | 779.81        | 0.76        |
+| Compiler | Time (sec) | CSS Size (KB) | Memory (MB) |
+|------------|-------------|---------------|-------------|
+| bugo/sass-embedded-php | 0.6622 | 779.55 | 0.76 |
+| bugo/sass-embedded-php-generator | 0.6011 | 779.56 | 0.76 |
 
 *Note: These results are approximate. Run `php benchmark.php` from the project root to see the actual results.*

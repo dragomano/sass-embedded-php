@@ -1,15 +1,17 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Bugo\Sass;
 
 use Composer\Composer;
-use Composer\IO\IOInterface;
-use Composer\Plugin\PluginInterface;
 use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\Installer\PackageEvent;
+use Composer\Installer\PackageEvents;
+use Composer\IO\IOInterface;
+use Composer\Plugin\PluginInterface;
 use Composer\Script\Event;
 use Composer\Script\ScriptEvents;
-use Composer\Installer\PackageEvents;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -18,9 +20,12 @@ use function is_dir;
 use function is_file;
 use function mkdir;
 use function realpath;
+use function rtrim;
 use function sprintf;
 use function strtoupper;
 use function substr;
+
+use const DIRECTORY_SEPARATOR;
 
 class Plugin implements PluginInterface, EventSubscriberInterface
 {
@@ -35,7 +40,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $config = $composer->getConfig();
 
         $this->packagePath = (string) realpath(__DIR__ . '/../');
-        $this->binDir = (string) $config->get('bin-dir');
+        $this->binDir      = (string) $config->get('bin-dir');
     }
 
     public function deactivate(Composer $composer, IOInterface $io): void {}
@@ -97,16 +102,19 @@ class Plugin implements PluginInterface, EventSubscriberInterface
                 '<warning>[%s]</warning> package directory not found, skipping npm install.',
                 self::PACKAGE_NAME
             ));
+
             return;
         }
 
         $packageJson = $this->packagePath . '/package.json';
+
         if (! is_file($packageJson)) {
             $io->write(sprintf(
                 '<warning>[%s]</warning> package.json not found in %s, skipping npm install.',
                 self::PACKAGE_NAME,
                 $this->packagePath
             ));
+
             return;
         }
 
@@ -124,6 +132,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
                 $npmBin,
                 $runtimeException->getMessage()
             ));
+
             return;
         }
 
@@ -132,15 +141,18 @@ class Plugin implements PluginInterface, EventSubscriberInterface
                 '<warning>[%s]</warning> npm not found in PATH or not executable, skipping npm install.',
                 self::PACKAGE_NAME
             ));
+
             return;
         }
 
         $nodeModules = $this->packagePath . '/node_modules/sass-embedded';
+
         if (is_dir($nodeModules)) {
             $io->write(sprintf(
                 '<info>[%s]</info> node_modules/sass-embedded already exists, skipping npm install.',
                 self::PACKAGE_NAME
             ));
+
             return;
         }
 
@@ -149,7 +161,8 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
         $io->write(sprintf(
             '<info>[%s]</info> running "npm install" in %s',
-            self::PACKAGE_NAME, $this->packagePath
+            self::PACKAGE_NAME,
+            $this->packagePath
         ));
 
         $process->run(function (string $type, string $buffer) use ($io): void {
@@ -161,6 +174,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
                 '<info>[%s]</info> npm install completed successfully.',
                 self::PACKAGE_NAME
             ));
+
             return;
         }
 
@@ -174,9 +188,9 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
     private function copyBinary(IOInterface $io): void
     {
-        $source = $this->packagePath . '/bin/bridge.js';
+        $source    = $this->packagePath . '/bin/bridge.js';
         $targetDir = rtrim($this->binDir, '/\\');
-        $target = $targetDir . DIRECTORY_SEPARATOR . 'bridge.js';
+        $target    = $targetDir . DIRECTORY_SEPARATOR . 'bridge.js';
 
         if (! is_file($source)) {
             $io->write(sprintf(
@@ -184,6 +198,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
                 self::PACKAGE_NAME,
                 $source
             ));
+
             return;
         }
 

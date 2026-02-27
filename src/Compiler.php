@@ -1,8 +1,11 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Bugo\Sass;
 
 use Generator;
+use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
 
 use function array_merge;
@@ -18,9 +21,11 @@ use function is_dir;
 use function json_decode;
 use function json_encode;
 use function parse_url;
-use function preg_match;
 use function pathinfo;
+use function preg_match;
 use function realpath;
+use function strlen;
+use function strpos;
 use function strtolower;
 use function strtoupper;
 use function substr;
@@ -41,14 +46,23 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
 
     protected ?Process $persistentProcess = null;
 
+    protected ?InputStream $persistentInput = null;
+
+    protected string $persistentStdoutBuffer = '';
+
+    protected string $persistentStderrBuffer = '';
+
     private const STREAM_THRESHOLD = 1024 * 1024;
+
+    private const PERSISTENT_RESPONSE_TIMEOUT = 30;
 
     private const DEFAULT_FILENAME = 'style';
 
     public function __construct(protected ?string $bridgePath = null, protected ?string $nodePath = null)
     {
         $this->bridgePath = $bridgePath ?? __DIR__ . '/../bin/bridge.js';
-        $this->nodePath = $nodePath ?? $this->findNode();
+        $this->nodePath   = $nodePath ?? $this->findNode();
+
         $this->checkEnvironment();
     }
 
@@ -82,6 +96,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         }
 
         $content = $this->readFile($filePath);
+
         if ($content === false) {
             throw new Exception("Unable to read file: $filePath");
         }
@@ -105,7 +120,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             throw new Exception("Source file not found: $inputPath");
         }
 
-        $inputMtime = $this->getFileMtime($inputPath);
+        $inputMtime  = $this->getFileMtime($inputPath);
         $outputMtime = file_exists($outputPath) ? $this->getFileMtime($outputPath) : 0;
 
         if ($inputMtime > $outputMtime) {
@@ -114,6 +129,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             }
 
             $css = $this->compileFile($inputPath, $options);
+
             file_put_contents($outputPath, $css);
 
             return true;
@@ -126,6 +142,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     {
         if (trim($source) === '') {
             yield '';
+
             return;
         }
 
@@ -136,7 +153,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         }
 
         $payload = $this->preparePayload($source, $options);
-        $result = $this->runCompile($payload);
+        $result  = $this->runCompile($payload);
 
         if (isset($result['isStreamed']) && $result['isStreamed']) {
             foreach ($result['chunks'] as $chunk) {
@@ -172,13 +189,17 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     public function disablePersistentMode(): void
     {
         if ($this->persistentProcess !== null && $this->persistentProcess->isRunning()) {
-            $this->persistentProcess->setInput(json_encode(['exit' => true]) . "\n");
-            $this->persistentProcess->run();
+            $this->persistentInput?->write(json_encode(['exit' => true]) . "\n");
+            $this->persistentInput?->close();
             $this->persistentProcess->stop();
         }
 
         $this->persistentProcess = null;
-        $this->persistentMode = false;
+        $this->persistentInput   = null;
+        $this->persistentMode    = false;
+
+        $this->persistentStdoutBuffer = '';
+        $this->persistentStderrBuffer = '';
     }
 
     protected function getFileMtime(string $path): int
@@ -189,7 +210,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     protected function compileSource(string $source, array $options, bool $persistent = false): string
     {
         $payload = $this->preparePayload($source, $options);
-        $data = $persistent ? $this->runCompilePersistent($payload) : $this->runCompile($payload);
+        $data    = $persistent ? $this->runCompilePersistent($payload) : $this->runCompile($payload);
 
         return $this->buildCssWithSourceMap($data, $options);
     }
@@ -228,15 +249,27 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     protected function runCompilePersistent(array $payload): array
     {
         $process = $this->getOrCreatePersistentProcess();
-        $process->setInput(json_encode($payload) . "\n");
-        $process->run();
 
-        return $this->parseProcessOutput($process, 'persistent');
+        $this->persistentInput?->write(json_encode($payload) . "\n");
+
+        $out  = $this->readPersistentResponseLine($process);
+        $data = json_decode($out, true);
+
+        if ($data === null) {
+            throw new Exception('Invalid response from sass persistent bridge');
+        }
+
+        if (! empty($data['error'])) {
+            throw new Exception('Sass parsing error: ' . $data['error']);
+        }
+
+        return $data;
     }
 
     protected function runCompile(array $payload): array
     {
         $cmd = [$this->nodePath, $this->bridgePath, '--stdin'];
+
         $process = $this->getOrCreateProcess($cmd);
         $process->setInput(json_encode($payload));
         $process->run();
@@ -247,15 +280,19 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     protected function parseProcessOutput(Process $process, string $mode): array
     {
         $out = trim($process->getOutput());
+
         if ($out === '') {
-            $err = trim($process->getErrorOutput());
+            $err       = trim($process->getErrorOutput());
             $errorType = $mode === 'persistent' ? 'persistent process' : 'process';
+
             throw new Exception("Sass $errorType failed: " . ($err ?: 'unknown error'));
         }
 
         $data = json_decode($out, true);
+
         if ($data === null) {
             $errorType = $mode === 'persistent' ? 'persistent bridge' : 'bridge';
+
             throw new Exception("Invalid response from sass $errorType");
         }
 
@@ -277,32 +314,34 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
 
     protected function inlineSourceMap(array $sourceMap): string
     {
-        $mapData = json_encode($sourceMap);
+        $mapData    = json_encode($sourceMap);
         $encodedMap = base64_encode($mapData);
 
-        return "\n/*# sourceMappingURL=data:application/json;base64," . $encodedMap . " */";
+        return "\n/*# sourceMappingURL=data:application/json;base64," . $encodedMap . ' */';
     }
 
     protected function fileSourceMap(array $sourceMap, array $options): string
     {
         $mapFile = (string) $options['sourceMapPath'];
+        $isUrl   = filter_var($mapFile, FILTER_VALIDATE_URL) !== false && preg_match('/^https?:/', $mapFile);
 
-        $isUrl = filter_var($mapFile, FILTER_VALIDATE_URL) !== false && preg_match('/^https?:/', $mapFile);
         if ($isUrl) {
-            return "\n/*# sourceMappingURL=" . $mapFile . " */";
+            return "\n/*# sourceMappingURL=" . $mapFile . ' */';
         }
 
         if (is_dir($mapFile)) {
             $sourceFilename = $this->getSourceFilenameFromUrl($options['url'] ?? '');
+
             $mapFile .= DIRECTORY_SEPARATOR . $sourceFilename . '.map';
         } elseif (strtolower(substr($mapFile, -4)) !== '.map') {
             $mapFile .= '.map';
         }
 
         file_put_contents($mapFile, json_encode($sourceMap));
+
         $sourceMappingUrl = basename($mapFile);
 
-        return "\n/*# sourceMappingURL=" . $sourceMappingUrl . " */";
+        return "\n/*# sourceMappingURL=" . $sourceMappingUrl . ' */';
     }
 
     protected function getSourceFilenameFromUrl(string $url): string
@@ -311,10 +350,10 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             return self::DEFAULT_FILENAME;
         }
 
-        $parsed = parse_url($url);
-        $path = $parsed['path'] ?? '';
+        $parsed   = parse_url($url);
+        $path     = $parsed['path'] ?? '';
         $basename = basename($path);
-        $info = pathinfo($basename);
+        $info     = pathinfo($basename);
 
         return $info['filename'] ?: self::DEFAULT_FILENAME;
     }
@@ -355,15 +394,59 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         }
 
         $cmd = [$this->nodePath, $this->bridgePath, '--persistent'];
+
+        $this->persistentInput = new InputStream();
+
         $this->persistentProcess = $this->createProcess($cmd);
+        $this->persistentProcess->setInput($this->persistentInput);
         $this->persistentProcess->start();
 
+        $this->persistentStdoutBuffer = '';
+        $this->persistentStderrBuffer = '';
+
         return $this->persistentProcess;
+    }
+
+    protected function readPersistentResponseLine(Process $process): string
+    {
+        $deadline = microtime(true) + self::PERSISTENT_RESPONSE_TIMEOUT;
+
+        while (true) {
+            $this->persistentStdoutBuffer .= $process->getIncrementalOutput();
+            $this->persistentStderrBuffer .= $process->getIncrementalErrorOutput();
+
+            $newLinePos = strpos($this->persistentStdoutBuffer, "\n");
+
+            if ($newLinePos !== false) {
+                $line = trim(substr($this->persistentStdoutBuffer, 0, $newLinePos));
+
+                $this->persistentStdoutBuffer = substr($this->persistentStdoutBuffer, $newLinePos + 1);
+
+                if ($line === '') {
+                    continue;
+                }
+
+                return $line;
+            }
+
+            if (! $process->isRunning()) {
+                $err = trim($this->persistentStderrBuffer);
+
+                throw new Exception('Sass persistent process failed: ' . ($err ?: 'unknown error'));
+            }
+
+            if (microtime(true) > $deadline) {
+                throw new Exception('Sass persistent process failed: timed out while waiting for response');
+            }
+
+            usleep(1000);
+        }
     }
 
     protected function findNode(): string
     {
         $candidates = ['node'];
+
         if ($this->isWindows()) {
             $candidates[] = 'C:\\Program Files\\nodejs\\node.exe';
             $candidates[] = 'C:\\Program Files (x86)\\nodejs\\node.exe';
@@ -401,6 +484,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         }
 
         $nodeModules = $this->getPackageRoot() . '/node_modules/sass-embedded';
+
         if (! is_dir($nodeModules)) {
             throw new Exception("sass-embedded not found. Run `npm install` in {$this->getPackageRoot()}.");
         }

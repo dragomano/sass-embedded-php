@@ -23,6 +23,7 @@
   "require-dev": {
     "bugo/scss-benchmark-utils": "dev-main",
     "composer/composer": "*",
+    "friendsofphp/php-cs-fixer": "^3.94",
     "mockery/mockery": "^2.0.x-dev",
     "pestphp/pest": "^3.8|^4.2",
     "rector/rector": "^2.3",
@@ -34,6 +35,7 @@
     }
   },
   "scripts": {
+    "fix": "vendor/bin/php-cs-fixer fix",
     "check": "vendor/bin/rector process --dry-run --clear-cache",
     "benchmark": "php benchmark.php",
     "test": "vendor/bin/pest --colors=always",

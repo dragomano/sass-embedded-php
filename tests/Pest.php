@@ -1,10 +1,15 @@
-<?php declare(strict_types=1);
+<?php
 
-use Bugo\Sass\CompilerInterface;
+declare(strict_types=1);
+
+require_once __DIR__ . '/TimeOverrides.php';
+
 use Bugo\Sass\Compiler;
+use Bugo\Sass\CompilerInterface;
 use Mockery\Mock;
 use Mockery\MockInterface;
 use org\bovigo\vfs\vfsStream;
+use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
 
 function setupCompilerPaths(CompilerInterface $compiler): void
@@ -14,7 +19,8 @@ function setupCompilerPaths(CompilerInterface $compiler): void
     try {
         $reflection->getProperty('nodePath')->setValue($compiler, 'node');
         $reflection->getProperty('bridgePath')->setValue($compiler, __DIR__ . '/../bin/bridge.js');
-    } catch (ReflectionException) {}
+    } catch (ReflectionException) {
+    }
 }
 
 function mockProcess(string $expectedCss, ?array $expectedSourceMap = null): Mock|(MockInterface&Process)
@@ -23,7 +29,7 @@ function mockProcess(string $expectedCss, ?array $expectedSourceMap = null): Moc
     $mockProcess->shouldReceive('setInput')->andReturnSelf();
     $mockProcess->shouldReceive('run')->andReturn(0);
     $mockProcess->shouldReceive('getOutput')->andReturn(json_encode([
-        'css' => $expectedCss, 'sourceMap' => $expectedSourceMap
+        'css' => $expectedCss, 'sourceMap' => $expectedSourceMap,
     ]));
     $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
 
@@ -59,6 +65,7 @@ function setupVfs(array $files = []): string
 function generateLargeScss(int $size): string
 {
     $largeVariable = str_repeat('a', $size);
+
     return '$large: "' . $largeVariable . '"; body::after { content: $large; }';
 }
 
@@ -68,18 +75,17 @@ function mockProcessForGenerator(
     ?array $expectedSourceMap = null,
     bool $isStreamed = false,
     array $chunks = []
-): Process
-{
+): Process {
     $mockProcess = Mockery::mock(Process::class);
 
     if (trim($scss) !== '') {
         $mockProcess->shouldReceive('setInput')->once()->andReturnSelf();
         $mockProcess->shouldReceive('run')->once()->andReturn(0);
         $mockProcess->shouldReceive('getOutput')->once()->andReturn(json_encode([
-            'css' => $expectedCss,
-            'sourceMap' => $expectedSourceMap,
+            'css'        => $expectedCss,
+            'sourceMap'  => $expectedSourceMap,
             'isStreamed' => $isStreamed,
-            'chunks' => $chunks ?: [$expectedCss]
+            'chunks'     => $chunks ?: [$expectedCss],
         ]));
     }
 
@@ -95,8 +101,7 @@ function compileAndAssertGenerator(
     ?array $expectedSourceMap = null,
     bool $isStreamed = false,
     array $chunks = []
-): void
-{
+): void {
     $mockProcess = mockProcessForGenerator($scss, $expectedResult, $expectedSourceMap, $isStreamed, $chunks);
 
     $compiler = mockCompiler();
@@ -110,8 +115,9 @@ function compileAndAssertGenerator(
     $generator = $compiler->compileStringAsGenerator($scss, $options);
     expect($generator)->toBeInstanceOf(Generator::class);
 
-    $result = '';
+    $result       = '';
     $hasSourceMap = false;
+
     foreach ($generator as $chunk) {
         if (str_contains($chunk, 'sourceMappingURL')) {
             $hasSourceMap = true;
@@ -145,16 +151,13 @@ function assertFindNodeReturnsPath(bool $isWindows): void
 function mockPersistentProcess(string $expectedCss, bool $withExit = false): Mock|(MockInterface&Process)
 {
     $mockProcess = Mockery::mock(Process::class);
+    $mockProcess->shouldReceive('setInput')->once()->with(Mockery::type(InputStream::class))->andReturnSelf();
     $mockProcess->shouldReceive('start')->once();
     $mockProcess->shouldReceive('isRunning')->andReturn(true);
-    $mockProcess->shouldReceive('setInput')->once()->andReturnSelf();
-    $mockProcess->shouldReceive('run')->once()->andReturn(0);
-    $mockProcess->shouldReceive('getOutput')->once()->andReturn(json_encode(['css' => $expectedCss]) . "\n");
-    $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
+    $mockProcess->shouldReceive('getIncrementalOutput')->once()->andReturn(json_encode(['css' => $expectedCss]) . "\n");
+    $mockProcess->shouldReceive('getIncrementalErrorOutput')->once()->andReturn('');
 
     if ($withExit) {
-        $mockProcess->shouldReceive('setInput')->once()->with(json_encode(['exit' => true]) . "\n")->andReturnSelf();
-        $mockProcess->shouldReceive('run')->once()->andReturn(0);
         $mockProcess->shouldReceive('stop')->once();
     }
 

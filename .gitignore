@@ -1,6 +1,7 @@
 .idea/
-.phpunit.result.cache
+.php-cs-fixer.cache
 .phpunit.cache/
+.phpunit.result.cache
 .vscode/
 composer.lock
 package-lock.json

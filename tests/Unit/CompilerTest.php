@@ -1,9 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 use Bugo\Sass\Compiler;
 use Bugo\Sass\Exception;
-use Symfony\Component\Process\Process;
+use Bugo\Sass\TimeOverrides;
 use org\bovigo\vfs\vfsStream;
+use Symfony\Component\Process\InputStream;
+use Symfony\Component\Process\Process;
 
 beforeEach(function () {
     $this->compiler = new Compiler(nodePath: 'node');
@@ -14,9 +18,9 @@ beforeEach(function () {
 });
 
 it('compiles a SCSS file', function () {
-    $files = ['test.scss' => '$color: blue; p { color: $color; }'];
-    $root = setupVfs($files);
-    $file = $root . '/test.scss';
+    $files    = ['test.scss' => '$color: blue; p { color: $color; }'];
+    $root     = setupVfs($files);
+    $file     = $root . '/test.scss';
     $expected = 'p{color:blue}';
 
     $mockProcess = mockProcess($expected);
@@ -30,12 +34,12 @@ it('compiles a SCSS file', function () {
 });
 
 it('compiles and saves file with sourceMap next to CSS', function () {
-    $files = ['test_source.scss' => '$color: green; .test { color: $color; }'];
-    $root = setupVfs($files);
-    $inputFile = $root . '/test_source.scss';
+    $files      = ['test_source.scss' => '$color: green; .test { color: $color; }'];
+    $root       = setupVfs($files);
+    $inputFile  = $root . '/test_source.scss';
     $outputFile = $root . '/test_output.css';
-    $mapFile = $root . '/test_output.css.map';
-    $scss = '$color: green; .test { color: $color; }';
+    $mapFile    = $root . '/test_output.css.map';
+    $scss       = '$color: green; .test { color: $color; }';
     $mapContent = ['version' => 3, 'sources' => ['file://' . $inputFile], 'sourcesContent' => [$scss], 'mappings' => '...'];
 
     $mockProcess = mockProcess('.test{color:green}', $mapContent);
@@ -45,7 +49,7 @@ it('compiles and saves file with sourceMap next to CSS', function () {
     $mockCompiler->shouldReceive('findNode')->andReturn('node');
 
     $mockCompiler->compileFileAndSave($inputFile, $outputFile, [
-        'sourceMap' => true,
+        'sourceMap'      => true,
         'includeSources' => true,
     ]);
 
@@ -63,12 +67,12 @@ it('compiles and saves file with sourceMap next to CSS', function () {
 it('compiles and saves file only if source has changed', function () {
     $scss1 = '$color: red; body { color: $color; }';
     $scss2 = '$color: blue; body { color: $color; }';
-    $css1 = 'body{color:red}';
-    $css2 = 'body{color:blue}';
+    $css1  = 'body{color:red}';
+    $css2  = 'body{color:blue}';
 
-    $files = ['test_input.scss' => $scss1];
-    $root = setupVfs($files);
-    $inputFile = $root . '/test_input.scss';
+    $files      = ['test_input.scss' => $scss1];
+    $root       = setupVfs($files);
+    $inputFile  = $root . '/test_input.scss';
     $outputFile = $root . '/test_output.css';
 
     touch($inputFile, 1000);
@@ -113,8 +117,8 @@ it('returns empty css for empty string input in compileString', function () {
 });
 
 it('returns empty css for empty file in compileFile', function () {
-    $files = ['tmp.scss' => ''];
-    $root = setupVfs($files);
+    $files   = ['tmp.scss' => ''];
+    $root    = setupVfs($files);
     $tmpFile = $root . '/tmp.scss';
 
     $mockCompiler = mockCompiler();
@@ -127,10 +131,10 @@ it('returns empty css for empty file in compileFile', function () {
 
 it('returns the options set via setOptions', function () {
     $options = [
-        'syntax' => 'sass',
-        'style' => 'compressed',
-        'sourceMap' => true,
-        'includeSources' => true,
+        'syntax'         => 'sass',
+        'style'          => 'compressed',
+        'sourceMap'      => true,
+        'includeSources' =>  true,
     ];
 
     $this->compiler->setOptions($options);
@@ -162,7 +166,7 @@ it('throws exception if no node candidate is successful', function () {
     $compiler->shouldReceive('createProcess')->andReturn($mockProcess);
 
     expect(function () use ($compiler) {
-        (function() {
+        (function () {
             return $this->findNode();
         })->call($compiler);
     })->toThrow(Exception::class, 'Node.js not found');
@@ -170,7 +174,7 @@ it('throws exception if no node candidate is successful', function () {
 
 it('throws Exception when bridge.js is missing', function () {
     $bridgePath = __DIR__ . '/nonexistent_bridge.js';
-    $compiler = new Compiler($bridgePath, 'node');
+    $compiler   = new Compiler($bridgePath, 'node');
     $compiler->compileString('$color: red;');
 })->throws(Exception::class);
 
@@ -180,8 +184,8 @@ it('throws Exception when file does not exist', function () {
 
 it('throws Exception when file exists but cannot be read', function () {
     $files = ['unreadable.scss' => '$color: red;'];
-    $root = setupVfs($files);
-    $file = $root . '/unreadable.scss';
+    $root  = setupVfs($files);
+    $file  = $root . '/unreadable.scss';
 
     $compiler = mock(Compiler::class)->makePartial();
     $compiler->shouldAllowMockingProtectedMethods();
@@ -226,6 +230,26 @@ it('throws Exception on invalid response from sass bridge', function () {
         ->toThrow(Exception::class, 'Invalid response from sass bridge');
 });
 
+it('throws Exception on error response from sass bridge in standard mode', function () {
+    $mockProcess = mock(Process::class);
+    $mockProcess->shouldReceive('setInput')->once()->andReturnSelf();
+    $mockProcess->shouldReceive('run')->once()->andReturn(0);
+    $mockProcess->shouldReceive('getOutput')->once()->andReturn(
+        json_encode(['error' => 'Unexpected token'])
+    );
+    $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
+
+    $compiler = mock(Compiler::class)->makePartial();
+    $compiler->__construct(nodePath: 'node');
+    $compiler->shouldAllowMockingProtectedMethods();
+    $compiler->shouldReceive('checkEnvironment')->andReturnNull();
+    $compiler->shouldReceive('findNode')->andReturn('node');
+    $compiler->shouldReceive('createProcess')->andReturn($mockProcess);
+
+    expect(fn() => $compiler->compileString('$color: red;'))
+        ->toThrow(Exception::class, 'Sass parsing error: Unexpected token');
+});
+
 it('throws Exception if sass-embedded folder does not exist', function () {
     $compiler = mock(Compiler::class)->makePartial();
 
@@ -249,11 +273,11 @@ it('throws Exception when input file does not exist in compileFileAndSave', func
 })->throws(Exception::class);
 
 it('processes source map with URL path', function () {
-    $scss = '$color: blue; .box { color: $color; }';
+    $scss        = '$color: blue; .box { color: $color; }';
     $mockProcess = mockProcess('body{color:blue}', [
-        'version' => 3,
+        'version'  => 3,
         'mappings' => '...',
-        'sources' => ['style.scss'],
+        'sources'  => ['style.scss'],
     ]);
 
     $compiler = mockCompiler();
@@ -265,11 +289,15 @@ it('processes source map with URL path', function () {
 
 it('processes source map with directory path', function () {
     $root = vfsStream::setup();
+
     vfsStream::newDirectory('test_maps')->at($root);
-    $testDir = vfsStream::url('root/test_maps');
+
+    $testDir   = vfsStream::url('root/test_maps');
     $inputFile = vfsStream::url('root/test.scss');
-    $scss = '$color: blue; .box { color: $color; }';
+    $scss      = '$color: blue; .box { color: $color; }';
+
     vfsStream::newFile('test.scss')->at($root)->setContent($scss);
+
     $expectedMapFile = $testDir . '/style.map';
 
     $mockProcess = mock(Process::class);
@@ -277,8 +305,8 @@ it('processes source map with directory path', function () {
     $mockProcess->shouldReceive('run')->once()->andReturn(0);
     $mockProcess->shouldReceive('getOutput')->once()->andReturn(
         json_encode([
-            'css' => 'body{color:blue}',
-            'sourceMap' => ['version' => 3, 'mappings' => '...', 'sources' => ['https://example.com/style.scss']]
+            'css'       => 'body{color:blue}',
+            'sourceMap' => ['version' => 3, 'mappings' => '...', 'sources' => ['https://example.com/style.scss']],
         ])
     );
     $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
@@ -291,9 +319,9 @@ it('processes source map with directory path', function () {
     $css = $compiler->compileFile(
         $inputFile,
         [
-            'sourceMap' => true,
+            'sourceMap'     => true,
             'sourceMapPath' => $testDir,
-            'url' => 'https://example.com/style.scss',
+            'url'           => 'https://example.com/style.scss',
         ]
     );
 
@@ -313,10 +341,10 @@ it('extracts filename from URL in getSourceFilenameFromUrl', function () {
 
 it('caches Node.js process between compilations for performance', function () {
     $expectedCss = <<<'CSS'
-body {
-  color: red;
-}
-CSS;
+    body {
+      color: red;
+    }
+    CSS;
 
     $mockProcess = mockProcess($expectedCss);
     $mockProcess->shouldReceive('isRunning')->andReturn(true);
@@ -341,7 +369,7 @@ CSS;
 });
 
 it('assembles streamed chunks in compileString', function () {
-    $scss = '$color: red; body { color: $color; }';
+    $scss   = '$color: red; body { color: $color; }';
     $chunks = ['body{', 'color:red', '}'];
 
     $mockProcess = mock(Process::class);
@@ -350,7 +378,7 @@ it('assembles streamed chunks in compileString', function () {
     $mockProcess->shouldReceive('getOutput')->once()->andReturn(
         json_encode([
             'isStreamed' => true,
-            'chunks' => $chunks,
+            'chunks'     => $chunks,
         ])
     );
     $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
@@ -365,29 +393,29 @@ it('assembles streamed chunks in compileString', function () {
     expect($css)->toBe('body{color:red}');
 });
 it('checks that compileStringAsGenerator returns generator with correct results', function () {
-    $scss = '$color: red; body { color: $color; }';
+    $scss        = '$color: red; body { color: $color; }';
     $expectedCss = <<<'CSS'
-body {
-  color: red;
-}
-CSS;
+    body {
+      color: red;
+    }
+    CSS;
 
     compileAndAssertGenerator($scss, $expectedCss);
 });
 
 it('handles large files with streaming and generators', function () {
-    $scss = generateLargeScss(1024 * 1024);
+    $scss          = generateLargeScss(1024 * 1024);
     $largeVariable = str_repeat('a', 1024 * 1024);
 
     $expectedLargeCss = /** @lang text */ <<<'CSS'
-body::after {
-  content: "
-CSS;
+    body::after {
+      content: "
+    CSS;
     $expectedLargeCss .= $largeVariable;
     $expectedLargeCss .= /** @lang text */ <<<'CSS'
-";
-}
-CSS;
+    ";
+    }
+    CSS;
 
     compileAndAssertGenerator($scss, $expectedLargeCss, [], null, true, [$expectedLargeCss]);
 
@@ -401,16 +429,16 @@ it('optimizes memory usage with cached processes during repeated compilations', 
     $mockProcess->shouldReceive('setInput')->times(5)->andReturnSelf();
     $mockProcess->shouldReceive('run')->times(5)->andReturn(0);
     $expectedMemoryCss = <<<'CSS'
-body {
-  color: red;
-  font-size: 10px;
-}
-CSS;
+    body {
+      color: red;
+      font-size: 10px;
+    }
+    CSS;
 
     $mockProcess->shouldReceive('getOutput')->andReturn(
         json_encode([
-            'css' => $expectedMemoryCss,
-            'sourceMap' => null
+            'css'       => $expectedMemoryCss,
+            'sourceMap' => null,
         ])
     );
     $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
@@ -447,23 +475,23 @@ it('returns empty result for empty string in compileStringAsGenerator', function
 });
 
 it('compiles string as generator with sourceMap in streamed mode', function () {
-    $scss = '$color: red; body { color: $color; }';
+    $scss        = '$color: red; body { color: $color; }';
     $expectedCss = 'body{color:red}';
-    $sourceMap = ['version' => 3, 'mappings' => '...'];
+    $sourceMap   = ['version' => 3, 'mappings' => '...'];
 
     compileAndAssertGenerator($scss, $expectedCss, ['sourceMap' => true], $sourceMap, true, [$expectedCss]);
 });
 
 it('compiles string as generator with sourceMap in non-streamed mode', function () {
-    $scss = '$color: blue; body { color: $color; }';
+    $scss        = '$color: blue; body { color: $color; }';
     $expectedCss = 'body{color:blue}';
-    $sourceMap = ['version' => 3, 'mappings' => '...'];
+    $sourceMap   = ['version' => 3, 'mappings' => '...'];
 
     compileAndAssertGenerator($scss, $expectedCss, ['sourceMap' => true], $sourceMap);
 });
 
 it('resets cached process when not running', function () {
-    $scss = '$color: green; body { color: $color; }';
+    $scss        = '$color: green; body { color: $color; }';
     $expectedCss = 'body{color:green}';
 
     $mockProcess = mock(Process::class);
@@ -486,10 +514,10 @@ it('resets cached process when not running', function () {
 });
 
 it('processes sourceMap with file path adding .map extension', function () {
-    $scss = '$color: yellow; body { color: $color; }';
-    $expectedCss = 'body{color:yellow}';
-    $sourceMap = ['version' => 3, 'mappings' => '...'];
-    $mapPath = vfsStream::url('root/output');
+    $scss            = '$color: yellow; body { color: $color; }';
+    $expectedCss     = 'body{color:yellow}';
+    $sourceMap       = ['version' => 3, 'mappings' => '...'];
+    $mapPath         = vfsStream::url('root/output');
     $expectedMapFile = $mapPath . '.map';
 
     $mockProcess = mock(Process::class);
@@ -497,8 +525,8 @@ it('processes sourceMap with file path adding .map extension', function () {
     $mockProcess->shouldReceive('run')->once()->andReturn(0);
     $mockProcess->shouldReceive('getOutput')->once()->andReturn(
         json_encode([
-            'css' => $expectedCss,
-            'sourceMap' => $sourceMap
+            'css'       => $expectedCss,
+            'sourceMap' => $sourceMap,
         ])
     );
     $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
@@ -514,21 +542,24 @@ it('processes sourceMap with file path adding .map extension', function () {
 });
 
 it('compiles multiple requests using persistent mode', function () {
-    $scss1 = '$color: red; body { color: $color; }';
-    $scss2 = '$color: blue; .test { color: $color; }';
+    $scss1        = '$color: red; body { color: $color; }';
+    $scss2        = '$color: blue; .test { color: $color; }';
     $expectedCss1 = 'body{color:red}';
     $expectedCss2 = '.test{color:blue}';
 
     $mockProcess = mock(Process::class);
+    $mockProcess
+        ->shouldReceive('setInput')
+        ->once()
+        ->with(Mockery::type(InputStream::class))
+        ->andReturnSelf();
     $mockProcess->shouldReceive('start')->once();
     $mockProcess->shouldReceive('isRunning')->andReturn(true);
-    $mockProcess->shouldReceive('setInput')->twice()->andReturnSelf();
-    $mockProcess->shouldReceive('run')->twice()->andReturn(0);
-    $mockProcess->shouldReceive('getOutput')->andReturn(
+    $mockProcess->shouldReceive('getIncrementalOutput')->andReturn(
         json_encode(['css' => $expectedCss1]) . "\n",
         json_encode(['css' => $expectedCss2]) . "\n"
     );
-    $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
+    $mockProcess->shouldReceive('getIncrementalErrorOutput')->andReturn('', '');
 
     $compiler = mockCompiler();
     $compiler->shouldReceive('createProcess')->once()->andReturn($mockProcess);
@@ -545,11 +576,11 @@ it('compiles multiple requests using persistent mode', function () {
 });
 
 it('compiles in persistent mode with options', function () {
-    $scss = '$color: green; .box { color: $color; }';
+    $scss        = '$color: green; .box { color: $color; }';
     $expectedCss = '.box{color:green}';
 
     $mockProcess = mockPersistentProcess($expectedCss);
-    $compiler = mockPersistentCompiler($mockProcess);
+    $compiler    = mockPersistentCompiler($mockProcess);
     $compiler->enablePersistentMode();
 
     $result = $compiler->compileInPersistentMode($scss, ['compressed' => true]);
@@ -557,11 +588,11 @@ it('compiles in persistent mode with options', function () {
 });
 
 it('exits persistent mode properly', function () {
-    $scss = '$color: red; body { color: $color; }';
+    $scss        = '$color: red; body { color: $color; }';
     $expectedCss = 'body{color:red}';
 
     $mockProcess = mockPersistentProcess($expectedCss, true);
-    $compiler = mockPersistentCompiler($mockProcess);
+    $compiler    = mockPersistentCompiler($mockProcess);
     $compiler->enablePersistentMode();
 
     $result = $compiler->compileInPersistentMode($scss);
@@ -571,18 +602,21 @@ it('exits persistent mode properly', function () {
 });
 
 it('throws exception on error in persistent mode', function () {
-    $scss = '$color: red; invalid syntax }';
+    $scss         = '$color: red; invalid syntax }';
     $errorMessage = 'Sass parsing error: Invalid syntax';
 
     $mockProcess = mock(Process::class);
+    $mockProcess
+        ->shouldReceive('setInput')
+        ->once()
+        ->with(Mockery::type(InputStream::class))
+        ->andReturnSelf();
     $mockProcess->shouldReceive('start')->once();
     $mockProcess->shouldReceive('isRunning')->andReturn(true);
-    $mockProcess->shouldReceive('setInput')->once()->andReturnSelf();
-    $mockProcess->shouldReceive('run')->once()->andReturn(0);
-    $mockProcess->shouldReceive('getOutput')->once()->andReturn(
+    $mockProcess->shouldReceive('getIncrementalOutput')->once()->andReturn(
         json_encode(['error' => $errorMessage]) . "\n"
     );
-    $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
+    $mockProcess->shouldReceive('getIncrementalErrorOutput')->once()->andReturn('');
 
     $compiler = mockCompiler();
     $compiler->shouldReceive('createProcess')->once()->andReturn($mockProcess);
@@ -603,19 +637,22 @@ it('returns empty css for empty string in persistent mode', function () {
 });
 
 it('compiles in persistent mode with sourceMap', function () {
-    $scss = '$color: purple; .box { color: $color; }';
-    $expectedCss = '.box{color:purple}';
+    $scss              = '$color: purple; .box { color: $color; }';
+    $expectedCss       = '.box{color:purple}';
     $expectedSourceMap = ['version' => 3, 'mappings' => '...'];
 
     $mockProcess = mock(Process::class);
+    $mockProcess
+        ->shouldReceive('setInput')
+        ->once()
+        ->with(Mockery::type(InputStream::class))
+        ->andReturnSelf();
     $mockProcess->shouldReceive('start')->once();
     $mockProcess->shouldReceive('isRunning')->andReturn(true);
-    $mockProcess->shouldReceive('setInput')->once()->andReturnSelf();
-    $mockProcess->shouldReceive('run')->once()->andReturn(0);
-    $mockProcess->shouldReceive('getOutput')->once()->andReturn(
+    $mockProcess->shouldReceive('getIncrementalOutput')->once()->andReturn(
         json_encode(['css' => $expectedCss, 'sourceMap' => $expectedSourceMap]) . "\n"
     );
-    $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
+    $mockProcess->shouldReceive('getIncrementalErrorOutput')->once()->andReturn('');
 
     $compiler = mockCompiler();
     $compiler->shouldReceive('createProcess')->once()->andReturn($mockProcess);
@@ -634,12 +671,15 @@ it('throws exception when persistent process fails with error output', function 
     $scss = '$color: red; body { color: $color; }';
 
     $mockProcess = mock(Process::class);
+    $mockProcess
+        ->shouldReceive('setInput')
+        ->once()
+        ->with(Mockery::type(InputStream::class))
+        ->andReturnSelf();
     $mockProcess->shouldReceive('start')->once();
-    $mockProcess->shouldReceive('isRunning')->andReturn(true);
-    $mockProcess->shouldReceive('setInput')->once()->andReturnSelf();
-    $mockProcess->shouldReceive('run')->once()->andReturn(0);
-    $mockProcess->shouldReceive('getOutput')->once()->andReturn('');
-    $mockProcess->shouldReceive('getErrorOutput')->once()->andReturn('Compilation failed: syntax error');
+    $mockProcess->shouldReceive('getIncrementalOutput')->once()->andReturn('');
+    $mockProcess->shouldReceive('getIncrementalErrorOutput')->once()->andReturn('Compilation failed: syntax error');
+    $mockProcess->shouldReceive('isRunning')->once()->andReturn(false);
 
     $compiler = mockCompiler();
     $compiler->shouldReceive('createProcess')->once()->andReturn($mockProcess);
@@ -658,12 +698,15 @@ it('throws exception when persistent process returns invalid json', function () 
     $scss = '$color: red; body { color: $color; }';
 
     $mockProcess = mock(Process::class);
+    $mockProcess
+        ->shouldReceive('setInput')
+        ->once()
+        ->with(Mockery::type(InputStream::class))
+        ->andReturnSelf();
     $mockProcess->shouldReceive('start')->once();
     $mockProcess->shouldReceive('isRunning')->andReturn(true);
-    $mockProcess->shouldReceive('setInput')->once()->andReturnSelf();
-    $mockProcess->shouldReceive('run')->once()->andReturn(0);
-    $mockProcess->shouldReceive('getOutput')->once()->andReturn('invalid json');
-    $mockProcess->shouldReceive('getErrorOutput')->andReturn('');
+    $mockProcess->shouldReceive('getIncrementalOutput')->once()->andReturn('invalid json' . "\n");
+    $mockProcess->shouldReceive('getIncrementalErrorOutput')->once()->andReturn('');
 
     $compiler = mockCompiler();
     $compiler->shouldReceive('createProcess')->once()->andReturn($mockProcess);
@@ -673,6 +716,61 @@ it('throws exception when persistent process returns invalid json', function () 
 
     expect(fn() => $compiler->compileInPersistentMode($scss))
         ->toThrow(Exception::class, 'Invalid response from sass persistent bridge');
+});
+
+it('skips empty persistent output lines before JSON response', function () {
+    $scss        = '$color: red; body { color: $color; }';
+    $expectedCss = 'body{color:red}';
+
+    $mockProcess = mock(Process::class);
+    $mockProcess
+        ->shouldReceive('setInput')
+        ->once()
+        ->with(Mockery::type(InputStream::class))
+        ->andReturnSelf();
+    $mockProcess->shouldReceive('start')->once();
+    $mockProcess->shouldReceive('getIncrementalOutput')->andReturn(
+        "\n",
+        json_encode(['css' => $expectedCss]) . "\n"
+    );
+    $mockProcess->shouldReceive('getIncrementalErrorOutput')->andReturn('', '');
+
+    $compiler = mockCompiler();
+    $compiler->shouldReceive('createProcess')->once()->andReturn($mockProcess);
+    $compiler->shouldReceive('checkEnvironment')->andReturnNull();
+    $compiler->shouldReceive('findNode')->andReturn('node');
+    $compiler->enablePersistentMode();
+
+    $result = $compiler->compileInPersistentMode($scss);
+    expect($result)->toBe($expectedCss);
+});
+
+it('throws exception when persistent response times out', function () {
+    $scss = '$color: red; body { color: $color; }';
+
+    TimeOverrides::$enabled = true;
+    TimeOverrides::$values  = [1000.0, 1031.0];
+
+    try {
+        $mockProcess = mock(Process::class);
+        $mockProcess->shouldReceive('setInput')->once()->with(Mockery::type(InputStream::class))->andReturnSelf();
+        $mockProcess->shouldReceive('start')->once();
+        $mockProcess->shouldReceive('getIncrementalOutput')->once()->andReturn('');
+        $mockProcess->shouldReceive('getIncrementalErrorOutput')->once()->andReturn('');
+        $mockProcess->shouldReceive('isRunning')->once()->andReturn(true);
+
+        $compiler = mockCompiler();
+        $compiler->shouldReceive('createProcess')->once()->andReturn($mockProcess);
+        $compiler->shouldReceive('checkEnvironment')->andReturnNull();
+        $compiler->shouldReceive('findNode')->andReturn('node');
+        $compiler->enablePersistentMode();
+
+        expect(fn() => $compiler->compileInPersistentMode($scss))
+            ->toThrow(Exception::class, 'Sass persistent process failed: timed out while waiting for response');
+    } finally {
+        TimeOverrides::$enabled = false;
+        TimeOverrides::$values  = [];
+    }
 });
 
 it('resets cached process and command when process is not running', function () {
@@ -700,11 +798,12 @@ it('resets cached process and command when process is not running', function () 
 });
 
 it('assembles streamed sourceMap chunks', function () {
-    $scss = '$color: orange; body { color: $color; }';
-    $expectedCss = 'body{color:orange}';
-    $sourceMap = ['version' => 3, 'mappings' => 'AAAA', 'sources' => ['input.scss']];
+    $scss          = '$color: orange; body { color: $color; }';
+    $expectedCss   = 'body{color:orange}';
+    $sourceMap     = ['version' => 3, 'mappings' => 'AAAA', 'sources' => ['input.scss']];
     $sourceMapJson = json_encode($sourceMap);
-    $chunkSize = 10;
+    $chunkSize     = 10;
+
     $chunks = [];
     for ($i = 0; $i < strlen($sourceMapJson); $i += $chunkSize) {
         $chunks[] = substr($sourceMapJson, $i, $chunkSize);
@@ -715,8 +814,8 @@ it('assembles streamed sourceMap chunks', function () {
     $mockProcess->shouldReceive('run')->once()->andReturn(0);
     $mockProcess->shouldReceive('getOutput')->once()->andReturn(
         json_encode([
-            'css' => $expectedCss,
-            'sourceMapChunks' => $chunks,
+            'css'                 => $expectedCss,
+            'sourceMapChunks'     => $chunks,
             'sourceMapIsStreamed' => true,
         ])
     );

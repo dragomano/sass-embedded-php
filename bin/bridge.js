@@ -54,24 +54,11 @@ function processSingleRequest() {
 }
 
 /**
- * Generator function for processing compilation results in chunks
- * Useful for memory-efficient handling of large CSS outputs
+ * Splits string data into fixed-size chunks.
  */
-function* cssChunkGenerator(css, chunkSize = 64 * 1024) {
-  for (let i = 0; i < css.length; i += chunkSize) {
-    yield css.slice(i, i + chunkSize);
-  }
-}
-
-/**
- * Generator function for processing sourceMap in chunks
- * Useful for large sourceMap data
- */
-function* sourceMapChunkGenerator(sourceMap, chunkSize = 64 * 1024) {
-  const mapString = JSON.stringify(sourceMap);
-
-  for (let i = 0; i < mapString.length; i += chunkSize) {
-    yield mapString.slice(i, i + chunkSize);
+function* chunkGenerator(data, chunkSize = 64 * 1024) {
+  for (let i = 0; i < data.length; i += chunkSize) {
+    yield data.slice(i, i + chunkSize);
   }
 }
 
@@ -274,7 +261,7 @@ function compilePayload(payload) {
 
   // Check if streaming mode is requested for large results
   if ('streamResult' in options && options.streamResult && finalCss.length > 1024 * 1024) {
-    response.chunks = Array.from(cssChunkGenerator(finalCss));
+    response.chunks = Array.from(chunkGenerator(finalCss));
     response.isStreamed = true;
 
     delete response.css;
@@ -282,7 +269,7 @@ function compilePayload(payload) {
 
   // Handle large sourceMap
   if (response.sourceMap && JSON.stringify(response.sourceMap).length > 1024 * 1024) {
-    response.sourceMapChunks = Array.from(sourceMapChunkGenerator(response.sourceMap));
+    response.sourceMapChunks = Array.from(chunkGenerator(JSON.stringify(response.sourceMap)));
     response.sourceMapIsStreamed = true;
 
     delete response.sourceMap;

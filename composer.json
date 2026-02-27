@@ -36,10 +36,10 @@
   "scripts": {
     "check": "vendor/bin/rector process --dry-run --clear-cache",
     "benchmark": "php benchmark.php",
-    "tests": "vendor/bin/pest --colors=always",
-    "tests-coverage": "vendor/bin/pest --colors=always --coverage --min=100",
-    "tests-coverage-clover": "vendor/bin/pest --colors=always --min=100 --coverage-clover coverage.xml",
-    "tests-coverage-html": "vendor/bin/pest --colors=always --min=100 --coverage-html coverage"
+    "test": "vendor/bin/pest --colors=always",
+    "test-coverage": "vendor/bin/pest --colors=always --coverage --min=100",
+    "test-coverage-clover": "vendor/bin/pest --colors=always --min=100 --coverage-clover coverage.xml",
+    "test-coverage-html": "vendor/bin/pest --colors=always --min=100 --coverage-html coverage"
   },
   "extra": {
     "class": "Bugo\\Sass\\Plugin"

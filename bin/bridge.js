@@ -158,6 +158,7 @@ function preserveComments(css) {
 
   const preserved = css.replace(/\/\*[\s\S]*?\*\//g, (match) => {
     comments.push(match);
+
     return `__COMMENT_PLACEHOLDER_${index++}__`;
   });
 
@@ -167,14 +168,17 @@ function preserveComments(css) {
 function restoreComments(css, comments, minify = false) {
   if (comments.length === 0) return css;
 
-  return css.replace(/__COMMENT_PLACEHOLDER_(\d+)__/g, (_, index) => {
+  let restored = css.replace(/__COMMENT_PLACEHOLDER_(\d+)__/g, (_, index) => {
     const comment = comments[parseInt(index, 10)] || '';
-    if (minify && !comment.startsWith('/*!')) {
-      return '';
-    }
 
-    return comment;
+    return minify && !comment.startsWith('/*!') ? '' : comment;
   });
+
+  if (!minify) {
+    restored = restored.replace(/\*\/(?:\s*(?=\/\*)|\s+(?=[^\/\s]))/g, '*/\n');
+  }
+
+  return restored;
 }
 
 function optimizeCss(css, sourceMap, options, minify = false) {

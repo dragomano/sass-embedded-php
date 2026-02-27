@@ -110,6 +110,8 @@ SCSS;
 
     expect($css)->toContain('/* regular comment */')
         ->and($css)->toContain('/*! important comment */')
+        ->and($css)->toContain("/* regular comment */\n/*! important comment */")
+        ->and($css)->toContain("/*! important comment */\n.test {")
         ->and($css)->not()->toContain('// single line comment')
         ->and($css)->toContain('.test {')
         ->and($css)->toContain('color: red;');

@@ -146,7 +146,7 @@ function preserveComments(css) {
   const preserved = css.replace(/\/\*[\s\S]*?\*\//g, (match) => {
     comments.push(match);
 
-    return `__COMMENT_PLACEHOLDER_${index++}__`;
+    return `@comment-placeholder-${index++};`;
   });
 
   return { preserved, comments };
@@ -155,7 +155,7 @@ function preserveComments(css) {
 function restoreComments(css, comments, minify = false) {
   if (comments.length === 0) return css;
 
-  let restored = css.replace(/__COMMENT_PLACEHOLDER_(\d+)__/g, (_, index) => {
+  let restored = css.replace(/@comment-placeholder-(\d+);/g, (_, index) => {
     const comment = comments[parseInt(index, 10)] || '';
 
     return minify && !comment.startsWith('/*!') ? '' : comment;

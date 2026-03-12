@@ -251,8 +251,13 @@ function compilePayload(payload) {
   const shouldMinify = options.minimize || ('compressed' in options && options.compressed) || options.style === 'compressed';
 
   const optimized = optimizeCss(result.css, normalizedSourceMap, options, shouldMinify);
-  const finalCss = optimized.css;
+  let finalCss = optimized.css;
   const finalSourceMap = optimized.sourceMap;
+
+  // Remove empty lines if requested
+  if (options.removeEmptyLines && !shouldMinify) {
+    finalCss = finalCss.replace(/\n\n+/g, '\n');
+  }
 
   const response = {
     css: finalCss,

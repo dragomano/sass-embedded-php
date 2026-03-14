@@ -8,6 +8,10 @@ use Generator;
 use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
 
+use function array_filter;
+use function array_flip;
+use function array_intersect_key;
+use function array_key_exists;
 use function array_merge;
 use function base64_encode;
 use function basename;
@@ -17,6 +21,7 @@ use function file_put_contents;
 use function filemtime;
 use function filter_var;
 use function implode;
+use function is_array;
 use function is_dir;
 use function json_decode;
 use function json_encode;
@@ -29,14 +34,22 @@ use function strpos;
 use function strtolower;
 use function strtoupper;
 use function substr;
+use function trigger_error;
 use function trim;
 
 use const DIRECTORY_SEPARATOR;
+use const E_USER_DEPRECATED;
 use const FILTER_VALIDATE_URL;
 
 class Compiler implements CompilerInterface, PersistentCompilerInterface
 {
-    protected array $options = [];
+    protected Options $options;
+
+    private const KNOWN_OPTIONS = [
+        'syntax', 'style', 'sourceMap', 'includeSources', 'loadPaths',
+        'quietDeps', 'silenceDeprecations', 'verbose', 'removeEmptyLines',
+        'sourceMapPath', 'url', 'sourceFile', 'streamResult',
+    ];
 
     protected static ?Process $cachedProcess = null;
 
@@ -60,20 +73,32 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
 
     public function __construct(protected ?string $bridgePath = null, protected ?string $nodePath = null)
     {
+        $this->options    = new Options();
         $this->bridgePath = $bridgePath ?? __DIR__ . '/../bin/bridge.js';
         $this->nodePath   = $nodePath ?? $this->findNode();
 
         $this->checkEnvironment();
     }
 
-    public function setOptions(array $options): static
+    public function setOptions(Options|array $options): static
     {
-        $this->options = $options;
+        if (is_array($options)) {
+            trigger_error(
+                'Passing an array to ' . static::class . '::setOptions() is deprecated. Use an Options object instead.',
+                E_USER_DEPRECATED,
+            );
+
+            $normalized    = $this->normalizeArrayOptions($options);
+            $known         = array_intersect_key($normalized, array_flip(self::KNOWN_OPTIONS));
+            $this->options = new Options(...$known);
+        } else {
+            $this->options = $options;
+        }
 
         return $this;
     }
 
-    public function getOptions(): array
+    public function getOptions(): Options
     {
         return $this->options;
     }
@@ -84,7 +109,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             return '';
         }
 
-        $options = array_merge($this->options, $options);
+        $options = array_merge($this->resolveOptions(), $options);
 
         return $this->compileSource($source, $options);
     }
@@ -105,7 +130,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             return '';
         }
 
-        $options = array_merge($this->options, $options);
+        $options = array_merge($this->resolveOptions(), $options);
 
         if (! isset($options['url'])) {
             $options['url'] = 'file://' . realpath($filePath);
@@ -146,7 +171,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             return;
         }
 
-        $options = array_merge($this->options, $options);
+        $options = array_merge($this->resolveOptions(), $options);
 
         if (strlen($source) > self::STREAM_THRESHOLD) {
             $options['streamResult'] = true;
@@ -174,7 +199,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             return '';
         }
 
-        $options = array_merge($this->options, $options);
+        $options = array_merge($this->resolveOptions(), $options);
 
         return $this->compileSource($source, $options, true);
     }
@@ -205,6 +230,33 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     protected function getFileMtime(string $path): int
     {
         return filemtime($path);
+    }
+
+    /**
+     * Converts the stored Options object to a plain array for bridge communication,
+     * omitting properties that were not explicitly set (null values).
+     *
+     * @return array<string, mixed>
+     */
+    protected function resolveOptions(): array
+    {
+        return array_filter((array) $this->options, static fn($value): bool => $value !== null);
+    }
+
+    /**
+     * Normalizes legacy array option keys to their canonical equivalents before
+     * converting to an Options object.
+     *
+     * @param  array<string, mixed> $options
+     * @return array<string, mixed>
+     */
+    private function normalizeArrayOptions(array $options): array
+    {
+        if (! empty($options['minimize']) || (array_key_exists('compressed', $options) && $options['compressed'])) {
+            $options['style'] = 'compressed';
+        }
+
+        return $options;
     }
 
     protected function compileSource(string $source, array $options, bool $persistent = false): string

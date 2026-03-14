@@ -8,9 +8,9 @@ use Generator;
 
 interface CompilerInterface
 {
-    public function setOptions(array $options): static;
+    public function setOptions(Options|array $options): static;
 
-    public function getOptions(): array;
+    public function getOptions(): Options;
 
     public function compileString(string $source, array $options = []): string;
 

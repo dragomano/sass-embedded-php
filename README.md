@@ -66,6 +66,7 @@ echo $css;
 require __DIR__ . '/vendor/autoload.php';
 
 use Bugo\Sass\Compiler;
+use Bugo\Sass\Options;
 
 $compiler = new Compiler();
 
@@ -79,10 +80,12 @@ body {
 }
 SCSS;
 
-$css = $compiler->compileString($scss, [
-    'compressed' => true,
-    'sourceMap' => true,
-]);
+$compiler->setOptions(new Options(
+    style: 'compressed',
+    sourceMap: true,
+));
+
+$css = $compiler->compileString($scss);
 
 echo $css;
 ```
@@ -144,15 +147,18 @@ This method automatically checks if the source file has been modified since the 
 require __DIR__ . '/vendor/autoload.php';
 
 use Bugo\Sass\Compiler;
+use Bugo\Sass\Options;
 
 $compiler = new Compiler();
 
-$css = $compiler->compileFile(__DIR__ . '/assets/app.scss', [
-    'sourceMap' => true,
-    'includeSources' => true,
-    'sourceMapPath' => __DIR__ . '/assets/',
-    'style' => 'compressed',
-]);
+$compiler->setOptions(new Options(
+    style: 'compressed',
+    sourceMap: true,
+    includeSources: true,
+    sourceMapPath: __DIR__ . '/assets/',
+));
+
+$css = $compiler->compileFile(__DIR__ . '/assets/app.scss');
 
 file_put_contents(__DIR__ . '/assets/app.css', $css);
 
@@ -178,29 +184,33 @@ $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 Options can be set either for the entire compiler at once or for a specific method separately:
 
 ```php
-$compiler->setOptions([
-    'syntax' => 'indented',
-    'minimize' => true,
-    'sourceMap' => true,
-]);
+use Bugo\Sass\Options;
+
+$compiler->setOptions(new Options(
+    syntax: 'indented',
+    style: 'compressed',
+    sourceMap: true,
+));
 ```
 
 ## Advanced options
 
 These options allow controlling additional aspects of Sass compilation.
 
-| Option              | Type          | Description                                    | Usage example                  |
-|---------------------|---------------|------------------------------------------------|--------------------------------|
-| loadPaths           | array<string> | Array of paths for searching Sass imports      | `['./libs', './node_modules']` |
-| quietDeps           | bool          | Suppresses warnings from dependencies          | `true`                         |
-| silenceDeprecations | bool          | Suppresses warnings about deprecated functions | `true`                         |
-| verbose             | bool          | Enables verbose output of messages             | `true`                         |
+| Option              | Type          | Description                                     | Usage example                   |
+|---------------------|---------------|-------------------------------------------------|---------------------------------|
+| loadPaths           | array<string> | Array of paths for searching Sass imports       | `['./libs', './node_modules']`  |
+| quietDeps           | bool          | Suppresses warnings from dependencies           | `true`                          |
+| silenceDeprecations | array<string> | Suppresses warnings about specific deprecations | `['import', 'color-functions']` |
+| verbose             | bool          | Enables verbose output of messages              | `true`                          |
 
 ```php
-$compiler->setOptions([
-    'loadPaths' => ['/path/to/custom/libs'],
-    'quietDeps' => true,
-    'silenceDeprecations' => true,
-    'verbose' => true,
-]);
+use Bugo\Sass\Options;
+
+$compiler->setOptions(new Options(
+    loadPaths: ['/path/to/custom/libs'],
+    quietDeps: true,
+    silenceDeprecations: ['import'],
+    verbose: true,
+));
 ```

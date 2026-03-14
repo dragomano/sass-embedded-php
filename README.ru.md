@@ -66,6 +66,7 @@ echo $css;
 require __DIR__ . '/vendor/autoload.php';
 
 use Bugo\Sass\Compiler;
+use Bugo\Sass\Options;
 
 $compiler = new Compiler();
 
@@ -79,10 +80,12 @@ body {
 }
 SCSS;
 
-$css = $compiler->compileString($scss, [
-    'compressed' => true,
-    'sourceMap' => true,
-]);
+$compiler->setOptions(new Options(
+    style: 'compressed',
+    sourceMap: true,
+));
+
+$css = $compiler->compileString($scss);
 
 echo $css;
 ```
@@ -144,15 +147,18 @@ try {
 require __DIR__ . '/vendor/autoload.php';
 
 use Bugo\Sass\Compiler;
+use Bugo\Sass\Options;
 
 $compiler = new Compiler();
 
-$css = $compiler->compileFile(__DIR__ . '/assets/app.scss', [
-    'sourceMap' => true,
-    'includeSources' => true,
-    'sourceMapPath' => __DIR__ . '/assets/',
-    'style' => 'compressed',
-]);
+$compiler->setOptions(new Options(
+    style: 'compressed',
+    sourceMap: true,
+    includeSources: true,
+    sourceMapPath: __DIR__ . '/assets/',
+));
+
+$css = $compiler->compileFile(__DIR__ . '/assets/app.scss');
 
 file_put_contents(__DIR__ . '/assets/app.css', $css);
 
@@ -167,40 +173,44 @@ echo "CSS скомпилирован с картой источников!\n";
 $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 ```
 
-| Параметр | Тип | Описание | Возможные значения |
-|-------|----|----------|--------------|
-| syntax | string | Синтаксис входного файла | 'scss' для SCSS, 'indented' или 'sass' для SASS |
-| style | string | Стиль вывода | 'compressed' или 'expanded' |
-| sourceMap | bool | Генерировать карту источников | true или false |
-| includeSources | bool | Включать исходный код в карту | true или false |
-| sourceMapPath | string | URL-адрес уже созданной карты или путь для сохранения новой | |
+| Параметр       | Тип    | Описание                                                    | Возможные значения                              |
+|----------------|--------|-------------------------------------------------------------|-------------------------------------------------|
+| syntax         | string | Синтаксис входного файла                                    | 'scss' для SCSS, 'indented' или 'sass' для SASS |
+| style          | string | Стиль вывода                                                | 'compressed' или 'expanded'                     |
+| sourceMap      | bool   | Генерировать карту источников                               | true или false                                  |
+| includeSources | bool   | Включать исходный код в карту                               | true или false                                  |
+| sourceMapPath  | string | URL-адрес уже созданной карты или путь для сохранения новой |                                                 |
 
 Параметры можно включать как для всего компилятора сразу, так и для конкретного метода отдельно:
 
 ```php
-$compiler->setOptions([
-    'syntax' => 'indented',
-    'minimize' => true,
-    'sourceMap' => true,
-]);
+use Bugo\Sass\Options;
+
+$compiler->setOptions(new Options(
+    syntax: 'indented',
+    style: 'compressed',
+    sourceMap: true,
+));
 ```
 
 ## Расширенные опции
 
 Эти опции позволяют контролировать дополнительные аспекты компиляции Sass.
 
-| Опция | Тип | Описание | Пример использования |
-|--------|------|-------------|---------------------|
-| loadPaths | array<string> | Массив путей для поиска импортов Sass | `['./libs', './node_modules']` |
-| quietDeps | bool | Подавляет предупреждения от зависимостей | `true` |
-| silenceDeprecations | bool | Подавляет предупреждения об устаревших функциях | `true` |
-| verbose | bool | Включает подробный вывод сообщений | `true` |
+| Опция               | Тип           | Описание                                              | Пример использования            |
+|---------------------|---------------|-------------------------------------------------------|---------------------------------|
+| loadPaths           | array<string> | Массив путей для поиска импортов Sass                 | `['./libs', './node_modules']`  |
+| quietDeps           | bool          | Подавляет предупреждения от зависимостей              | `true`                          |
+| silenceDeprecations | array<string> | Подавляет предупреждения об определённых устареваниях | `['import', 'color-functions']` |
+| verbose             | bool          | Включает подробный вывод сообщений                    | `true`                          |
 
 ```php
-$compiler->setOptions([
-    'loadPaths' => ['/path/to/custom/libs'],
-    'quietDeps' => true,
-    'silenceDeprecations' => true,
-    'verbose' => true,
-]);
+use Bugo\Sass\Options;
+
+$compiler->setOptions(new Options(
+    loadPaths: ['/path/to/custom/libs'],
+    quietDeps: true,
+    silenceDeprecations: ['import'],
+    verbose: true,
+));
 ```

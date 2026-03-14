@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Bugo\Sass\Compiler;
 use Bugo\Sass\Exception;
+use Bugo\Sass\Options;
 use Bugo\Sass\TimeOverrides;
 use org\bovigo\vfs\vfsStream;
 use Symfony\Component\Process\InputStream;
@@ -129,16 +130,83 @@ it('returns empty css for empty file in compileFile', function () {
     assertCssEquals($css, '');
 });
 
-it('returns the options set via setOptions', function () {
-    $options = [
-        'syntax'         => 'sass',
-        'style'          => 'compressed',
-        'sourceMap'      => true,
-        'includeSources' =>  true,
-    ];
+it('returns the options set via setOptions as Options object', function () {
+    @$this->compiler->setOptions(['syntax' => 'sass', 'style' => 'compressed', 'sourceMap' => true]);
+
+    $options = $this->compiler->getOptions();
+
+    expect($options)->toBeInstanceOf(Options::class)
+        ->and($options->syntax)->toBe('sass')
+        ->and($options->style)->toBe('compressed')
+        ->and($options->sourceMap)->toBeTrue();
+});
+
+it('setOptions with array triggers a deprecation notice', function () {
+    $deprecation = null;
+    set_error_handler(function (int $errno, string $errstr) use (&$deprecation): bool {
+        $deprecation = $errstr;
+
+        return true;
+    }, E_USER_DEPRECATED);
+
+    $this->compiler->setOptions(['style' => 'compressed']);
+
+    restore_error_handler();
+
+    expect($deprecation)->toContain('setOptions')
+        ->and($deprecation)->toContain('deprecated');
+});
+
+it('setOptions with Options object stores it directly', function () {
+    $options = new Options(
+        syntax: 'sass',
+        style: 'compressed',
+        sourceMap: true,
+        includeSources: true,
+    );
 
     $this->compiler->setOptions($options);
-    expect($this->compiler->getOptions())->toBe($options);
+
+    $stored = $this->compiler->getOptions();
+
+    expect($stored)->toBeInstanceOf(Options::class)
+        ->and($stored->syntax)->toBe('sass')
+        ->and($stored->style)->toBe('compressed')
+        ->and($stored->sourceMap)->toBeTrue()
+        ->and($stored->includeSources)->toBeTrue();
+});
+
+it('setOptions with Options object does not trigger a deprecation notice', function () {
+    $deprecation = null;
+    set_error_handler(function (int $errno, string $errstr) use (&$deprecation): bool {
+        $deprecation = $errstr;
+
+        return true;
+    }, E_USER_DEPRECATED);
+
+    $this->compiler->setOptions(new Options(style: 'compressed'));
+
+    restore_error_handler();
+
+    expect($deprecation)->toBeNull();
+});
+
+it('normalizes minimize => true to style compressed in setOptions array', function () {
+    @$this->compiler->setOptions(['minimize' => true]);
+
+    expect($this->compiler->getOptions()->style)->toBe('compressed');
+});
+
+it('normalizes compressed => true to style compressed in setOptions array', function () {
+    @$this->compiler->setOptions(['compressed' => true]);
+
+    expect($this->compiler->getOptions()->style)->toBe('compressed');
+});
+
+it('minimize wins over explicit style in setOptions array', function () {
+    @$this->compiler->setOptions(['minimize' => true, 'style' => 'expanded']);
+
+    expect($this->compiler->getOptions()->style)->toBe('compressed');
 });
 
 it('returns node path on Windows', function () {

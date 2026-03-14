@@ -558,6 +558,21 @@ it('compiles string as generator with sourceMap in non-streamed mode', function 
     compileAndAssertGenerator($scss, $expectedCss, ['sourceMap' => true], $sourceMap);
 });
 
+it('compileStringAsGenerator uses persistent process when persistent mode is enabled', function () {
+    $scss        = '$color: red; body { color: $color; }';
+    $expectedCss = 'body{color:red}';
+
+    $mockProcess = mockPersistentProcess($expectedCss);
+    $compiler    = mockPersistentCompiler($mockProcess);
+    $compiler->enablePersistentMode();
+
+    $generator = $compiler->compileStringAsGenerator($scss);
+    expect($generator)->toBeInstanceOf(Generator::class);
+
+    $result = implode('', iterator_to_array($generator));
+    expect($result)->toBe($expectedCss);
+});
+
 it('resets cached process when not running', function () {
     $scss        = '$color: green; body { color: $color; }';
     $expectedCss = 'body{color:green}';

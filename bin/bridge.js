@@ -272,12 +272,15 @@ function compilePayload(payload) {
     delete response.css;
   }
 
-  // Handle large sourceMap
-  if (response.sourceMap && JSON.stringify(response.sourceMap).length > 1024 * 1024) {
-    response.sourceMapChunks = Array.from(chunkGenerator(JSON.stringify(response.sourceMap)));
-    response.sourceMapIsStreamed = true;
+  // Handle large sourceMap (only when caller expects streamed chunks)
+  if (options.streamResult && response.sourceMap) {
+    const sourceMapStr = JSON.stringify(response.sourceMap);
+    if (sourceMapStr.length > 1024 * 1024) {
+      response.sourceMapChunks = Array.from(chunkGenerator(sourceMapStr));
+      response.sourceMapIsStreamed = true;
 
-    delete response.sourceMap;
+      delete response.sourceMap;
+    }
   }
 
   return response;

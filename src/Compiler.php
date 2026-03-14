@@ -29,7 +29,6 @@ use function parse_url;
 use function pathinfo;
 use function preg_match;
 use function realpath;
-use function strlen;
 use function strpos;
 use function strtolower;
 use function strtoupper;
@@ -64,8 +63,6 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     protected string $persistentStdoutBuffer = '';
 
     protected string $persistentStderrBuffer = '';
-
-    private const STREAM_THRESHOLD = 1024 * 1024;
 
     private const PERSISTENT_RESPONSE_TIMEOUT = 30;
 
@@ -173,12 +170,10 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
 
         $options = array_merge($this->resolveOptions(), $options);
 
-        if (strlen($source) > self::STREAM_THRESHOLD) {
-            $options['streamResult'] = true;
-        }
-
         $payload = $this->preparePayload($source, $options);
-        $result  = $this->runCompile($payload);
+        $result  = $this->persistentMode
+            ? $this->runCompilePersistent($payload)
+            : $this->runCompile($payload);
 
         if (isset($result['isStreamed']) && $result['isStreamed']) {
             foreach ($result['chunks'] as $chunk) {

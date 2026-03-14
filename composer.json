@@ -18,14 +18,14 @@
   "require": {
     "php": "^8.2",
     "composer-plugin-api": "^2.0",
-    "symfony/process": "^7.4"
+    "symfony/process": "^7.4|^8.0"
   },
   "require-dev": {
     "bugo/scss-benchmark-utils": "dev-main",
     "composer/composer": "*",
     "friendsofphp/php-cs-fixer": "^3.94",
-    "mockery/mockery": "^2.0.x-dev",
-    "pestphp/pest": "^3.8|^4.2",
+    "mockery/mockery": "dev-bugfix/spy-generics",
+    "pestphp/pest": "^3.8|^4.4",
     "rector/rector": "^2.3",
     "mikey179/vfsstream": "^1.6"
   },

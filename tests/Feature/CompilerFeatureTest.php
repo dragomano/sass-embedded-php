@@ -34,16 +34,22 @@ it('compiles a simple SCSS string', function () {
     expect(trim($css))->toBe(trim($expected));
 });
 
-it('compiles with sourceMap enabled', function () {
+it('does not append source map without sourceMapPath', function () {
+    $scss = '$color: blue; .box { color: $color; }';
+    $css = $this->compiler->compileInPersistentMode($scss, ['includeSources' => true]);
+
+    expect($css)->not()->toContain('sourceMappingURL');
+});
+
+it('compiles with inline sourceMapPath', function () {
     $scss = '$color: blue; .box { color: $color; }';
 
     $css = $this->compiler->compileInPersistentMode($scss, [
-        'sourceMap'      => true,
+        'sourceMapPath'  => 'inline',
         'includeSources' => true,
     ]);
 
-    expect($css)->toMatch('/\/\*# sourceMappingURL=data:application\/json;base64,/')
-        ->and($css)->not()->toMatch('/\/\*# sourceMappingURL=.*\.map \*\//');
+    expect($css)->toMatch('/\/\*# sourceMappingURL=data:application\/json;base64,/');
 
     preg_match('/sourceMappingURL=data:application\/json;base64,([^ ]*)/', $css, $matches);
     $encodedMap = $matches[1];
@@ -53,6 +59,38 @@ it('compiles with sourceMap enabled', function () {
     expect($mapContent)->toHaveKey('version')
         ->and($mapContent)->toHaveKey('mappings')
         ->and($mapContent)->toHaveKey('sourcesContent');
+});
+
+it('compiles with sourceMapPath enabled', function () {
+    $scss = '$color: blue; .box { color: $color; }';
+    $dir = sys_get_temp_dir() . '/sass-embedded-php-tests';
+
+    if (! is_dir($dir)) {
+        mkdir($dir, 0777, true);
+    }
+
+    $mapPath = $dir . '/feature.map';
+    if (file_exists($mapPath)) {
+        unlink($mapPath);
+    }
+
+    $css = $this->compiler->compileInPersistentMode($scss, [
+        'sourceMapPath'  => $mapPath,
+        'includeSources' => true,
+    ]);
+
+    expect($css)->toContain('/*# sourceMappingURL=feature.map */')
+        ->and(file_exists($mapPath))->toBeTrue();
+
+    $mapContent = json_decode((string) file_get_contents($mapPath), true);
+
+    expect($mapContent)->toHaveKey('version')
+        ->and($mapContent)->toHaveKey('mappings')
+        ->and($mapContent)->toHaveKey('sourcesContent');
+
+    if (file_exists($mapPath)) {
+        unlink($mapPath);
+    }
 });
 
 it('compiles simple SASS syntax to CSS', function () {

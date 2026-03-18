@@ -45,7 +45,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     protected Options $options;
 
     private const KNOWN_OPTIONS = [
-        'syntax', 'style', 'sourceMap', 'includeSources', 'loadPaths',
+        'syntax', 'style', 'includeSources', 'loadPaths',
         'quietDeps', 'silenceDeprecations', 'verbose', 'removeEmptyLines',
         'sourceMapPath', 'url', 'sourceFile', 'streamResult',
     ];
@@ -67,6 +67,8 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     private const PERSISTENT_RESPONSE_TIMEOUT = 30;
 
     private const DEFAULT_FILENAME = 'style';
+
+    private const INLINE_SOURCE_MAP = 'inline';
 
     public function __construct(protected ?string $bridgePath = null, protected ?string $nodePath = null)
     {
@@ -146,10 +148,6 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         $outputMtime = file_exists($outputPath) ? $this->getFileMtime($outputPath) : 0;
 
         if ($inputMtime > $outputMtime) {
-            if (! empty($options['sourceMap']) && empty($options['sourceMapPath'])) {
-                $options['sourceMapPath'] = $outputPath;
-            }
-
             $css = $this->compileFile($inputPath, $options);
 
             file_put_contents($outputPath, $css);
@@ -183,7 +181,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             yield $result['css'] ?? '';
         }
 
-        if (! empty($result['sourceMap'])) {
+        if (! empty($result['sourceMap']) && ! empty($options['sourceMapPath'])) {
             yield $this->processSourceMap($result['sourceMap'], $options);
         }
     }
@@ -286,7 +284,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             $sourceMap = json_decode($sourceMap, true);
         }
 
-        if (! empty($sourceMap)) {
+        if (! empty($sourceMap) && ! empty($options['sourceMapPath'])) {
             $css .= $this->processSourceMap($sourceMap, $options);
         }
 
@@ -352,7 +350,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
 
     protected function processSourceMap(array $sourceMap, array $options): string
     {
-        if (empty($options['sourceMapPath'])) {
+        if (($options['sourceMapPath'] ?? null) === self::INLINE_SOURCE_MAP) {
             return $this->inlineSourceMap($sourceMap);
         }
 

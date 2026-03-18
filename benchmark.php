@@ -36,7 +36,6 @@ $results = (new BenchmarkRunner())
         $compiler = new EmbeddedCompiler(nodePath: 'node');
         $compiler->setOptions(new Options(
             style: 'compressed',
-            sourceMap: true,
             sourceMapPath: 'result-sass-embedded-php-non-persistent.css.map',
             sourceFile: 'generated.scss',
         ));
@@ -56,7 +55,6 @@ $results = (new BenchmarkRunner())
         $compiler = new EmbeddedCompiler(nodePath: 'node');
         $compiler->setOptions(new Options(
             style: 'compressed',
-            sourceMap: true,
             sourceMapPath: 'result-sass-embedded-php-persistent.css.map',
             sourceFile: 'generated.scss',
         ));
@@ -68,7 +66,6 @@ $results = (new BenchmarkRunner())
         $compiler = new EmbeddedCompiler(nodePath: 'node');
         $compiler->setOptions(new Options(
             style: 'compressed',
-            sourceMap: true,
             sourceMapPath: 'result-sass-embedded-php-persistent-generator.css.map',
             sourceFile: 'generated.scss',
             streamResult: true,

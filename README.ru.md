@@ -82,7 +82,7 @@ SCSS;
 
 $compiler->setOptions(new Options(
     style: 'compressed',
-    sourceMap: true,
+    sourceMapPath: 'inline',
 ));
 
 $css = $compiler->compileString($scss);
@@ -153,7 +153,6 @@ $compiler = new Compiler();
 
 $compiler->setOptions(new Options(
     style: 'compressed',
-    sourceMap: true,
     includeSources: true,
     sourceMapPath: __DIR__ . '/assets/',
 ));
@@ -163,6 +162,27 @@ $css = $compiler->compileFile(__DIR__ . '/assets/app.scss');
 file_put_contents(__DIR__ . '/assets/app.css', $css);
 
 echo "CSS скомпилирован с картой источников!\n";
+```
+
+### Компиляция строки со встроенной картой источников
+
+```php
+<?php
+require __DIR__ . '/vendor/autoload.php';
+
+use Bugo\Sass\Compiler;
+use Bugo\Sass\Options;
+
+$compiler = new Compiler();
+
+$compiler->setOptions(new Options(
+    sourceMapPath: 'inline',
+    includeSources: true,
+));
+
+$css = $compiler->compileString('$color: red; body { color: $color; }');
+
+echo $css;
 ```
 
 ## Параметры
@@ -177,9 +197,8 @@ $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 |----------------|--------|-------------------------------------------------------------|-------------------------------------------------|
 | syntax         | string | Синтаксис входного файла                                    | 'scss' для SCSS, 'indented' или 'sass' для SASS |
 | style          | string | Стиль вывода                                                | 'compressed' или 'expanded'                     |
-| sourceMap      | bool   | Генерировать карту источников                               | true или false                                  |
 | includeSources | bool   | Включать исходный код в карту                               | true или false                                  |
-| sourceMapPath  | string | URL-адрес уже созданной карты или путь для сохранения новой |                                                 |
+| sourceMapPath  | string | `inline`, URL-адрес, директория или путь к файлу карты       |                                                 |
 
 Параметры можно включать как для всего компилятора сразу, так и для конкретного метода отдельно:
 
@@ -189,9 +208,11 @@ use Bugo\Sass\Options;
 $compiler->setOptions(new Options(
     syntax: 'indented',
     style: 'compressed',
-    sourceMap: true,
+    sourceMapPath: '/out/style.map',
 ));
 ```
+
+Опция `sourceMap` удалена. Карта источников создаётся только при заданном `sourceMapPath`. Используйте `sourceMapPath: 'inline'`, чтобы встроить карту прямо в CSS.
 
 ## Расширенные опции
 

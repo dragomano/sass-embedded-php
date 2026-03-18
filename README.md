@@ -82,7 +82,7 @@ SCSS;
 
 $compiler->setOptions(new Options(
     style: 'compressed',
-    sourceMap: true,
+    sourceMapPath: 'inline',
 ));
 
 $css = $compiler->compileString($scss);
@@ -153,7 +153,6 @@ $compiler = new Compiler();
 
 $compiler->setOptions(new Options(
     style: 'compressed',
-    sourceMap: true,
     includeSources: true,
     sourceMapPath: __DIR__ . '/assets/',
 ));
@@ -163,6 +162,27 @@ $css = $compiler->compileFile(__DIR__ . '/assets/app.scss');
 file_put_contents(__DIR__ . '/assets/app.css', $css);
 
 echo "CSS compiled with source map!\n";
+```
+
+### Compiling string with inline source map
+
+```php
+<?php
+require __DIR__ . '/vendor/autoload.php';
+
+use Bugo\Sass\Compiler;
+use Bugo\Sass\Options;
+
+$compiler = new Compiler();
+
+$compiler->setOptions(new Options(
+    sourceMapPath: 'inline',
+    includeSources: true,
+));
+
+$css = $compiler->compileString('$color: red; body { color: $color; }');
+
+echo $css;
 ```
 
 ## Options
@@ -177,9 +197,8 @@ $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 |----------------|--------|--------------------------------------------|------------------------------------------------|
 | syntax         | string | Input syntax                               | 'scss' for SCSS, 'indented' or 'sass' for SASS |
 | style          | string | Output style                               | 'compressed' or 'expanded'                     |
-| sourceMap      | bool   | Generate source map                        | true or false                                  |
 | includeSources | bool   | Include source code in map                 | true or false                                  |
-| sourceMapPath  | string | URL to existing map or path for saving new |                                                |
+| sourceMapPath  | string | `inline`, URL, directory, or file path for source map |                                         |
 
 Options can be set either for the entire compiler at once or for a specific method separately:
 
@@ -189,9 +208,11 @@ use Bugo\Sass\Options;
 $compiler->setOptions(new Options(
     syntax: 'indented',
     style: 'compressed',
-    sourceMap: true,
+    sourceMapPath: '/out/style.map',
 ));
 ```
+
+`sourceMap` was removed. Source maps are generated only when `sourceMapPath` is set. Use `sourceMapPath: 'inline'` to embed the map directly into CSS.
 
 ## Advanced options
 

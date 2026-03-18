@@ -9,7 +9,6 @@ readonly class Options
     public function __construct(
         public ?string $syntax = null,
         public ?string $style = null,
-        public ?bool   $sourceMap = null,
         public ?bool   $includeSources = null,
         public ?array  $loadPaths = null,
         public ?bool   $quietDeps = null,

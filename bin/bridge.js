@@ -222,8 +222,8 @@ function compilePayload(payload) {
     compileOpts.style = 'compressed';
   }
 
-  if (options.sourceMap) {
-    compileOpts.sourceMap = options.sourceMap;
+  if (options.sourceMapPath) {
+    compileOpts.sourceMap = true;
 
     if ('includeSources' in options && options.includeSources) {
       compileOpts.sourceMapIncludeSources = options.includeSources;

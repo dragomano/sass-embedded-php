@@ -200,7 +200,7 @@ $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 | includeSources | bool   | Включать исходный код в карту                               | true или false                                  |
 | sourceMapPath  | string | `inline`, URL-адрес, директория или путь к файлу карты       |                                                 |
 
-Параметры можно включать как для всего компилятора сразу, так и для конкретного метода отдельно:
+Параметры передаются только через объект `Options`: либо для всего компилятора, либо для конкретного вызова метода:
 
 ```php
 use Bugo\Sass\Options;
@@ -209,6 +209,11 @@ $compiler->setOptions(new Options(
     syntax: 'indented',
     style: 'compressed',
     sourceMapPath: '/out/style.map',
+));
+
+$css = $compiler->compileString($scss, new Options(
+    style: 'compressed',
+    sourceMapPath: 'inline',
 ));
 ```
 

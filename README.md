@@ -200,7 +200,7 @@ $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 | includeSources | bool   | Include source code in map                 | true or false                                  |
 | sourceMapPath  | string | `inline`, URL, directory, or file path for source map |                                         |
 
-Options can be set either for the entire compiler at once or for a specific method separately:
+Options are passed only as an `Options` object, either for the entire compiler or for a specific method call:
 
 ```php
 use Bugo\Sass\Options;
@@ -209,6 +209,11 @@ $compiler->setOptions(new Options(
     syntax: 'indented',
     style: 'compressed',
     sourceMapPath: '/out/style.map',
+));
+
+$css = $compiler->compileString($scss, new Options(
+    style: 'compressed',
+    sourceMapPath: 'inline',
 ));
 ```
 

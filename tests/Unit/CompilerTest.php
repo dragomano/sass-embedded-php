@@ -30,7 +30,7 @@ it('compiles a SCSS file', function () {
     $mockCompiler->shouldReceive('checkEnvironment')->andReturnNull();
     $mockCompiler->shouldReceive('findNode')->andReturn('node');
 
-    $css = $mockCompiler->compileFile($file, ['compressed' => true]);
+    $css = $mockCompiler->compileFile($file, new Options(style: 'compressed'));
     assertCssEquals($css, $expected);
 });
 
@@ -71,10 +71,10 @@ it('compiles and saves file with sourceMap next to CSS when sourceMapPath is set
     $mockCompiler->shouldReceive('checkEnvironment')->andReturnNull();
     $mockCompiler->shouldReceive('findNode')->andReturn('node');
 
-    $mockCompiler->compileFileAndSave($inputFile, $outputFile, [
-        'includeSources' => true,
-        'sourceMapPath'  => $outputFile,
-    ]);
+    $mockCompiler->compileFileAndSave($inputFile, $outputFile, new Options(
+        includeSources: true,
+        sourceMapPath: $outputFile,
+    ));
 
     expect(file_exists($outputFile))->toBeTrue()
         ->and(file_exists($mapFile))->toBeTrue();
@@ -153,7 +153,11 @@ it('returns empty css for empty file in compileFile', function () {
 });
 
 it('returns the options set via setOptions as Options object', function () {
-    @$this->compiler->setOptions(['syntax' => 'sass', 'style' => 'compressed', 'sourceMapPath' => '/tmp/style.map']);
+    $this->compiler->setOptions(new Options(
+        syntax: 'sass',
+        style: 'compressed',
+        sourceMapPath: '/tmp/style.map',
+    ));
 
     $options = $this->compiler->getOptions();
 
@@ -161,31 +165,6 @@ it('returns the options set via setOptions as Options object', function () {
         ->and($options->syntax)->toBe('sass')
         ->and($options->style)->toBe('compressed')
         ->and($options->sourceMapPath)->toBe('/tmp/style.map');
-});
-
-it('ignores legacy sourceMap in setOptions array', function () {
-    @$this->compiler->setOptions(['style' => 'compressed', 'sourceMap' => true]);
-
-    $options = $this->compiler->getOptions();
-
-    expect($options->style)->toBe('compressed')
-        ->and($options->sourceMapPath)->toBeNull();
-});
-
-it('setOptions with array triggers a deprecation notice', function () {
-    $deprecation = null;
-    set_error_handler(function (int $errno, string $errstr) use (&$deprecation): bool {
-        $deprecation = $errstr;
-
-        return true;
-    }, E_USER_DEPRECATED);
-
-    $this->compiler->setOptions(['style' => 'compressed']);
-
-    restore_error_handler();
-
-    expect($deprecation)->toContain('setOptions')
-        ->and($deprecation)->toContain('deprecated');
 });
 
 it('setOptions with Options object stores it directly', function () {
@@ -222,22 +201,21 @@ it('setOptions with Options object does not trigger a deprecation notice', funct
     expect($deprecation)->toBeNull();
 });
 
-it('normalizes minimize => true to style compressed in setOptions array', function () {
-    @$this->compiler->setOptions(['minimize' => true]);
+it('method-level Options override compiler defaults', function () {
+    $this->compiler->setOptions(new Options(
+        style: 'expanded',
+        includeSources: true,
+    ));
 
-    expect($this->compiler->getOptions()->style)->toBe('compressed');
-});
+    $resolved = (fn() => array_merge(
+        $this->resolveOptions(),
+        $this->resolveOptions(new Options(style: 'compressed'))
+    ))->call($this->compiler);
 
-it('normalizes compressed => true to style compressed in setOptions array', function () {
-    @$this->compiler->setOptions(['compressed' => true]);
-
-    expect($this->compiler->getOptions()->style)->toBe('compressed');
-});
-
-it('minimize wins over explicit style in setOptions array', function () {
-    @$this->compiler->setOptions(['minimize' => true, 'style' => 'expanded']);
-
-    expect($this->compiler->getOptions()->style)->toBe('compressed');
+    expect($resolved)->toBe([
+        'style' => 'compressed',
+        'includeSources' => true,
+    ]);
 });
 
 it('returns node path on Windows', function () {
@@ -382,7 +360,7 @@ it('processes source map with URL path', function () {
     $compiler = mockCompiler();
     $compiler->shouldReceive('createProcess')->andReturn($mockProcess);
 
-    $css = $compiler->compileString($scss, ['sourceMapPath' => 'https://example.com/style.map']);
+    $css = $compiler->compileString($scss, new Options(sourceMapPath: 'https://example.com/style.map'));
     expect($css)->toContain('/*# sourceMappingURL=https://example.com/style.map */');
 });
 
@@ -394,7 +372,7 @@ it('processes inline source map', function () {
     $compiler = mockCompiler();
     $compiler->shouldReceive('createProcess')->andReturn($mockProcess);
 
-    $css = $compiler->compileString($scss, ['sourceMapPath' => 'inline']);
+    $css = $compiler->compileString($scss, new Options(sourceMapPath: 'inline'));
     expect($css)->toMatch('/\/\*# sourceMappingURL=data:application\/json;base64,/');
 });
 
@@ -447,10 +425,10 @@ it('processes source map with directory path', function () {
 
     $css = $compiler->compileFile(
         $inputFile,
-        [
-            'sourceMapPath' => $testDir,
-            'url'           => 'https://example.com/style.scss',
-        ]
+        new Options(
+            sourceMapPath: $testDir,
+            url: 'https://example.com/style.scss',
+        )
     );
 
     expect(file_exists($expectedMapFile))->toBeTrue()
@@ -516,7 +494,7 @@ it('assembles streamed chunks in compileString', function () {
     $compiler->shouldReceive('findNode')->andReturn('node');
     $compiler->shouldReceive('createProcess')->andReturn($mockProcess);
 
-    $css = $compiler->compileString($scss, ['streamResult' => true]);
+    $css = $compiler->compileString($scss, new Options(streamResult: true));
 
     expect($css)->toBe('body{color:red}');
 });
@@ -545,7 +523,7 @@ it('handles large files with streaming and generators', function () {
     }
     CSS;
 
-    compileAndAssertGenerator($scss, $expectedLargeCss, [], null, true, [$expectedLargeCss]);
+    compileAndAssertGenerator($scss, $expectedLargeCss, null, null, true, [$expectedLargeCss]);
 
     expect(strlen($scss))->toBeGreaterThan(1024 * 1024);
 });
@@ -609,7 +587,7 @@ it('compiles string as generator with sourceMap in streamed mode', function () {
     vfsStream::setup();
     $mapPath     = vfsStream::url('root/streamed.map');
 
-    compileAndAssertGenerator($scss, $expectedCss, ['sourceMapPath' => $mapPath], $sourceMap, true, [$expectedCss]);
+    compileAndAssertGenerator($scss, $expectedCss, new Options(sourceMapPath: $mapPath), $sourceMap, true, [$expectedCss]);
 });
 
 it('compiles string as generator with sourceMap in non-streamed mode', function () {
@@ -619,7 +597,7 @@ it('compiles string as generator with sourceMap in non-streamed mode', function 
     vfsStream::setup();
     $mapPath     = vfsStream::url('root/non-streamed.map');
 
-    compileAndAssertGenerator($scss, $expectedCss, ['sourceMapPath' => $mapPath], $sourceMap);
+    compileAndAssertGenerator($scss, $expectedCss, new Options(sourceMapPath: $mapPath), $sourceMap);
 });
 
 it('compiles string as generator with inline sourceMap', function () {
@@ -627,7 +605,7 @@ it('compiles string as generator with inline sourceMap', function () {
     $expectedCss = 'body{color:teal}';
     $sourceMap   = ['version' => 3, 'mappings' => '...'];
 
-    compileAndAssertGenerator($scss, $expectedCss, ['sourceMapPath' => 'inline'], $sourceMap);
+    compileAndAssertGenerator($scss, $expectedCss, new Options(sourceMapPath: 'inline'), $sourceMap);
 });
 
 it('compileStringAsGenerator uses persistent process when persistent mode is enabled', function () {
@@ -691,7 +669,7 @@ it('processes sourceMap with file path adding .map extension', function () {
     $compiler->shouldReceive('findNode')->andReturn('node');
     $compiler->shouldReceive('createProcess')->andReturn($mockProcess);
 
-    $css = $compiler->compileString($scss, ['sourceMapPath' => $mapPath]);
+    $css = $compiler->compileString($scss, new Options(sourceMapPath: $mapPath));
     expect($css)->toBe($expectedCss . "\n/*# sourceMappingURL=output.map */")
         ->and(file_exists($expectedMapFile))->toBeTrue();
 });
@@ -738,7 +716,7 @@ it('compiles in persistent mode with options', function () {
     $compiler    = mockPersistentCompiler($mockProcess);
     $compiler->enablePersistentMode();
 
-    $result = $compiler->compileInPersistentMode($scss, ['compressed' => true]);
+    $result = $compiler->compileInPersistentMode($scss, new Options(style: 'compressed'));
     expect($result)->toBe($expectedCss);
 });
 
@@ -820,7 +798,7 @@ it('compiles in persistent mode with sourceMapPath', function () {
     );
     $compiler->enablePersistentMode();
 
-    $result = $compiler->compileInPersistentMode($scss, ['sourceMapPath' => $mapPath]);
+    $result = $compiler->compileInPersistentMode($scss, new Options(sourceMapPath: $mapPath));
     expect($result)->toBe($expectedCss . "\n/*# sourceMappingURL=persistent.map */");
 });
 
@@ -851,7 +829,7 @@ it('compiles in persistent mode with inline sourceMap', function () {
     );
     $compiler->enablePersistentMode();
 
-    $result = $compiler->compileInPersistentMode($scss, ['sourceMapPath' => 'inline']);
+    $result = $compiler->compileInPersistentMode($scss, new Options(sourceMapPath: 'inline'));
     expect($result)->toBe($expectedCss . "\n/*# sourceMappingURL=data:application/json;base64,encoded */");
 });
 
@@ -1017,7 +995,7 @@ it('assembles streamed sourceMap chunks', function () {
         "\n/*# sourceMappingURL=output.map */"
     );
 
-    $result = $compiler->compileString($scss, ['sourceMapPath' => 'output.map']);
+    $result = $compiler->compileString($scss, new Options(sourceMapPath: 'output.map'));
 
     expect($result)->toBe($expectedCss . "\n/*# sourceMappingURL=output.map */");
 });

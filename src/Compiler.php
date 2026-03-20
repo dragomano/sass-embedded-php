@@ -9,9 +9,6 @@ use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
 
 use function array_filter;
-use function array_flip;
-use function array_intersect_key;
-use function array_key_exists;
 use function array_merge;
 use function base64_encode;
 use function basename;
@@ -21,7 +18,6 @@ use function file_put_contents;
 use function filemtime;
 use function filter_var;
 use function implode;
-use function is_array;
 use function is_dir;
 use function json_decode;
 use function json_encode;
@@ -33,22 +29,14 @@ use function strpos;
 use function strtolower;
 use function strtoupper;
 use function substr;
-use function trigger_error;
 use function trim;
 
 use const DIRECTORY_SEPARATOR;
-use const E_USER_DEPRECATED;
 use const FILTER_VALIDATE_URL;
 
 class Compiler implements CompilerInterface, PersistentCompilerInterface
 {
     protected Options $options;
-
-    private const KNOWN_OPTIONS = [
-        'syntax', 'style', 'includeSources', 'loadPaths',
-        'quietDeps', 'silenceDeprecations', 'verbose', 'removeEmptyLines',
-        'sourceMapPath', 'url', 'sourceFile', 'streamResult',
-    ];
 
     protected static ?Process $cachedProcess = null;
 
@@ -79,20 +67,9 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         $this->checkEnvironment();
     }
 
-    public function setOptions(Options|array $options): static
+    public function setOptions(Options $options): static
     {
-        if (is_array($options)) {
-            trigger_error(
-                'Passing an array to ' . static::class . '::setOptions() is deprecated. Use an Options object instead.',
-                E_USER_DEPRECATED,
-            );
-
-            $normalized    = $this->normalizeArrayOptions($options);
-            $known         = array_intersect_key($normalized, array_flip(self::KNOWN_OPTIONS));
-            $this->options = new Options(...$known);
-        } else {
-            $this->options = $options;
-        }
+        $this->options = $options;
 
         return $this;
     }
@@ -102,18 +79,18 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         return $this->options;
     }
 
-    public function compileString(string $source, array $options = []): string
+    public function compileString(string $source, ?Options $options = null): string
     {
         if (trim($source) === '') {
             return '';
         }
 
-        $options = array_merge($this->resolveOptions(), $options);
+        $options = array_merge($this->resolveOptions(), $this->resolveOptions($options));
 
         return $this->compileSource($source, $options);
     }
 
-    public function compileFile(string $filePath, array $options = []): string
+    public function compileFile(string $filePath, ?Options $options = null): string
     {
         if (! file_exists($filePath)) {
             throw new Exception("File not found: $filePath");
@@ -129,7 +106,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             return '';
         }
 
-        $options = array_merge($this->resolveOptions(), $options);
+        $options = array_merge($this->resolveOptions(), $this->resolveOptions($options));
 
         if (! isset($options['url'])) {
             $options['url'] = 'file://' . realpath($filePath);
@@ -138,7 +115,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         return $this->compileSource($content, $options);
     }
 
-    public function compileFileAndSave(string $inputPath, string $outputPath, array $options = []): bool
+    public function compileFileAndSave(string $inputPath, string $outputPath, ?Options $options = null): bool
     {
         if (! file_exists($inputPath)) {
             throw new Exception("Source file not found: $inputPath");
@@ -158,7 +135,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         return false;
     }
 
-    public function compileStringAsGenerator(string $source, array $options = []): Generator
+    public function compileStringAsGenerator(string $source, ?Options $options = null): Generator
     {
         if (trim($source) === '') {
             yield '';
@@ -166,7 +143,7 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
             return;
         }
 
-        $options = array_merge($this->resolveOptions(), $options);
+        $options = array_merge($this->resolveOptions(), $this->resolveOptions($options));
 
         $payload = $this->preparePayload($source, $options);
         $result  = $this->persistentMode
@@ -186,13 +163,13 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
         }
     }
 
-    public function compileInPersistentMode(string $source, array $options = []): string
+    public function compileInPersistentMode(string $source, ?Options $options = null): string
     {
         if (trim($source) === '') {
             return '';
         }
 
-        $options = array_merge($this->resolveOptions(), $options);
+        $options = array_merge($this->resolveOptions(), $this->resolveOptions($options));
 
         return $this->compileSource($source, $options, true);
     }
@@ -226,30 +203,14 @@ class Compiler implements CompilerInterface, PersistentCompilerInterface
     }
 
     /**
-     * Converts the stored Options object to a plain array for bridge communication,
+     * Converts an Options object to a plain array for bridge communication,
      * omitting properties that were not explicitly set (null values).
      *
      * @return array<string, mixed>
      */
-    protected function resolveOptions(): array
+    protected function resolveOptions(?Options $options = null): array
     {
-        return array_filter((array) $this->options, static fn($value): bool => $value !== null);
-    }
-
-    /**
-     * Normalizes legacy array option keys to their canonical equivalents before
-     * converting to an Options object.
-     *
-     * @param  array<string, mixed> $options
-     * @return array<string, mixed>
-     */
-    private function normalizeArrayOptions(array $options): array
-    {
-        if (! empty($options['minimize']) || (array_key_exists('compressed', $options) && $options['compressed'])) {
-            $options['style'] = 'compressed';
-        }
-
-        return $options;
+        return array_filter((array) ($options ?? $this->options), static fn($value): bool => $value !== null);
     }
 
     protected function compileSource(string $source, array $options, bool $persistent = false): string

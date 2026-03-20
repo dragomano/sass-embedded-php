@@ -6,7 +6,7 @@ namespace Bugo\Sass;
 
 interface PersistentCompilerInterface
 {
-    public function compileInPersistentMode(string $source, array $options = []): string;
+    public function compileInPersistentMode(string $source, ?Options $options = null): string;
 
     public function enablePersistentMode(): static;
 

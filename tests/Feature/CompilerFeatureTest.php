@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Bugo\Sass\Compiler;
 use Bugo\Sass\Exception;
+use Bugo\Sass\Options;
 
 $sharedCompiler = null;
 
@@ -36,7 +37,7 @@ it('compiles a simple SCSS string', function () {
 
 it('does not append source map without sourceMapPath', function () {
     $scss = '$color: blue; .box { color: $color; }';
-    $css = $this->compiler->compileInPersistentMode($scss, ['includeSources' => true]);
+    $css = $this->compiler->compileInPersistentMode($scss, new Options(includeSources: true));
 
     expect($css)->not()->toContain('sourceMappingURL');
 });
@@ -44,10 +45,10 @@ it('does not append source map without sourceMapPath', function () {
 it('compiles with inline sourceMapPath', function () {
     $scss = '$color: blue; .box { color: $color; }';
 
-    $css = $this->compiler->compileInPersistentMode($scss, [
-        'sourceMapPath'  => 'inline',
-        'includeSources' => true,
-    ]);
+    $css = $this->compiler->compileInPersistentMode($scss, new Options(
+        sourceMapPath: 'inline',
+        includeSources: true,
+    ));
 
     expect($css)->toMatch('/\/\*# sourceMappingURL=data:application\/json;base64,/');
 
@@ -74,10 +75,10 @@ it('compiles with sourceMapPath enabled', function () {
         unlink($mapPath);
     }
 
-    $css = $this->compiler->compileInPersistentMode($scss, [
-        'sourceMapPath'  => $mapPath,
-        'includeSources' => true,
-    ]);
+    $css = $this->compiler->compileInPersistentMode($scss, new Options(
+        sourceMapPath: $mapPath,
+        includeSources: true,
+    ));
 
     expect($css)->toContain('/*# sourceMappingURL=feature.map */')
         ->and(file_exists($mapPath))->toBeTrue();
@@ -106,7 +107,7 @@ it('compiles simple SASS syntax to CSS', function () {
     }
     CSS;
 
-    $css = $this->compiler->compileInPersistentMode($sass, ['syntax' => 'sass']);
+    $css = $this->compiler->compileInPersistentMode($sass, new Options(syntax: 'sass'));
     expect(trim($css))->toBe(trim($expected));
 });
 
@@ -135,7 +136,7 @@ it('compiles nested SASS syntax with mixin', function () {
     }
     CSS;
 
-    $css = $this->compiler->compileInPersistentMode($sass, ['syntax' => 'sass']);
+    $css = $this->compiler->compileInPersistentMode($sass, new Options(syntax: 'sass'));
     expect(trim($css))->toBe(trim($expected));
 });
 
@@ -175,7 +176,7 @@ it('preserves only important comments in compressed mode', function () {
     }
     SCSS;
 
-    $css = $this->compiler->compileInPersistentMode($scss, ['style' => 'compressed']);
+    $css = $this->compiler->compileInPersistentMode($scss, new Options(style: 'compressed'));
 
     expect($css)->not()->toContain('/* regular comment */')
         ->and($css)->not()->toContain('// single line comment')

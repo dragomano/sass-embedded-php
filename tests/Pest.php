@@ -6,6 +6,7 @@ require_once __DIR__ . '/TimeOverrides.php';
 
 use Bugo\Sass\Compiler;
 use Bugo\Sass\CompilerInterface;
+use Bugo\Sass\Options;
 use Mockery\Mock;
 use Mockery\MockInterface;
 use org\bovigo\vfs\vfsStream;
@@ -97,7 +98,7 @@ function mockProcessForGenerator(
 function compileAndAssertGenerator(
     string $scss,
     string $expectedResult,
-    array $options = [],
+    ?Options $options = null,
     ?array $expectedSourceMap = null,
     bool $isStreamed = false,
     array $chunks = []

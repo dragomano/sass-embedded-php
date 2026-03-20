@@ -8,15 +8,15 @@ use Generator;
 
 interface CompilerInterface
 {
-    public function setOptions(Options|array $options): static;
+    public function setOptions(Options $options): static;
 
     public function getOptions(): Options;
 
-    public function compileString(string $source, array $options = []): string;
+    public function compileString(string $source, ?Options $options = null): string;
 
-    public function compileFile(string $filePath, array $options = []): string;
+    public function compileFile(string $filePath, ?Options $options = null): string;
 
-    public function compileFileAndSave(string $inputPath, string $outputPath, array $options = []): bool;
+    public function compileFileAndSave(string $inputPath, string $outputPath, ?Options $options = null): bool;
 
-    public function compileStringAsGenerator(string $source, array $options = []): Generator;
+    public function compileStringAsGenerator(string $source, ?Options $options = null): Generator;
 }

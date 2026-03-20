@@ -14,8 +14,8 @@
 
 ## Results
 
-| Compiler                                    | Time (sec) | CSS Size (KB) | Memory (MB) |
-|---------------------------------------------|------------|---------------|-------------|
-| bugo/sass-embedded-php-non-persistent       | 1.3226     | 1,551.91      | 1.52        |
-| bugo/sass-embedded-php-persistent           | 1.0212     | 1,551.91      | 1.52        |
-| bugo/sass-embedded-php-persistent-generator | 0.8670     | 1,551.84      | 1.52        |
+| Compiler | Time (sec) | CSS Size (KB) | Memory (MB) |
+|------------|-------------|---------------|-------------|
+| bugo/sass-embedded-php-non-persistent | 1.2390 | 1,551.91 | 1.52 |
+| bugo/sass-embedded-php-persistent | 0.9966 | 1,551.91 | 1.52 |
+| bugo/sass-embedded-php-persistent-generator | 0.8865 | 1,551.84 | 1.52 |

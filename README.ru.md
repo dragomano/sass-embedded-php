@@ -193,12 +193,21 @@ echo $css;
 $compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
 ```
 
-| Параметр       | Тип    | Описание                                                    | Возможные значения                              |
-|----------------|--------|-------------------------------------------------------------|-------------------------------------------------|
-| syntax         | string | Синтаксис входного файла                                    | 'scss' для SCSS, 'indented' или 'sass' для SASS |
-| style          | string | Стиль вывода                                                | 'compressed' или 'expanded'                     |
-| includeSources | bool   | Включать исходный код в карту                               | true или false                                  |
-| sourceMapPath  | string | `inline`, URL-адрес, директория или путь к файлу карты       |                                                 |
+| Параметр            | Тип           | Описание                                                 | Возможные значения                              | По умолчанию                                          |
+|---------------------|---------------|----------------------------------------------------------|-------------------------------------------------|-------------------------------------------------------|
+| syntax              | string        | Синтаксис входного файла                                 | 'scss' для SCSS, 'indented' или 'sass' для SASS | `scss`                                                |
+| style               | string        | Стиль вывода                                             | 'compressed' или 'expanded'                     | `expanded`                                            |
+| optimizeCss         | bool          | Включает постобработку и минимизацию через Lightning CSS | true или false                                  | `true`                                                |
+| includeSources      | bool          | Включать исходный код в карту                            | true или false                                  | `false`                                               |
+| loadPaths           | array<string> | Массив путей для поиска импортов Sass                    | `['./libs', './node_modules']`                  | `[]`                                                  |
+| quietDeps           | bool          | Подавляет предупреждения от зависимостей                 | true или false                                  | `false`                                               |
+| silenceDeprecations | array<string> | Подавляет предупреждения об определённых устареваниях    | `['import', 'color-functions']`                 | `[]`                                                  |
+| verbose             | bool          | Включает подробный вывод сообщений                       | true или false                                  | `false`                                               |
+| removeEmptyLines    | bool          | Удаляет лишние пустые строки в не сжатом выводе          | true или false                                  | `false`                                               |
+| sourceMapPath       | string        | `inline`, URL-адрес, директория или путь к файлу карты   |                                                 | отключено                                             |
+| url                 | string        | Задаёт URL исходника для Sass и source map               | file или HTTP(S) URL                            | auto в `compileFile()`, не задано в `compileString()` |
+| sourceFile          | string        | Задаёт виртуальное имя исходного файла для bridge        | например `style.scss`                           | внутреннее значение bridge                            |
+| streamResult        | bool          | Возвращает большие результаты компиляции чанками         | true или false                                  | `false`                                               |
 
 Параметры передаются только через объект `Options`: либо для всего компилятора, либо для конкретного вызова метода:
 
@@ -208,35 +217,15 @@ use Bugo\Sass\Options;
 $compiler->setOptions(new Options(
     syntax: 'indented',
     style: 'compressed',
+    optimizeCss: true,
     sourceMapPath: '/out/style.map',
 ));
 
 $css = $compiler->compileString($scss, new Options(
     style: 'compressed',
+    optimizeCss: false,
     sourceMapPath: 'inline',
 ));
 ```
 
-Опция `sourceMap` удалена. Карта источников создаётся только при заданном `sourceMapPath`. Используйте `sourceMapPath: 'inline'`, чтобы встроить карту прямо в CSS.
-
-## Расширенные опции
-
-Эти опции позволяют контролировать дополнительные аспекты компиляции Sass.
-
-| Опция               | Тип           | Описание                                              | Пример использования            |
-|---------------------|---------------|-------------------------------------------------------|---------------------------------|
-| loadPaths           | array<string> | Массив путей для поиска импортов Sass                 | `['./libs', './node_modules']`  |
-| quietDeps           | bool          | Подавляет предупреждения от зависимостей              | `true`                          |
-| silenceDeprecations | array<string> | Подавляет предупреждения об определённых устареваниях | `['import', 'color-functions']` |
-| verbose             | bool          | Включает подробный вывод сообщений                    | `true`                          |
-
-```php
-use Bugo\Sass\Options;
-
-$compiler->setOptions(new Options(
-    loadPaths: ['/path/to/custom/libs'],
-    quietDeps: true,
-    silenceDeprecations: ['import'],
-    verbose: true,
-));
-```
+Все доступные параметры в `Options` по умолчанию имеют значение `null`, что означает, что опция не была явно задана. В колонке `По умолчанию` указано фактическое поведение компилятора в этом случае.

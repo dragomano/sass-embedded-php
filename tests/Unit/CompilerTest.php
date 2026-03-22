@@ -156,6 +156,7 @@ it('returns the options set via setOptions as Options object', function () {
     $this->compiler->setOptions(new Options(
         syntax: 'sass',
         style: 'compressed',
+        optimizeCss: false,
         sourceMapPath: '/tmp/style.map',
     ));
 
@@ -164,6 +165,7 @@ it('returns the options set via setOptions as Options object', function () {
     expect($options)->toBeInstanceOf(Options::class)
         ->and($options->syntax)->toBe('sass')
         ->and($options->style)->toBe('compressed')
+        ->and($options->optimizeCss)->toBeFalse()
         ->and($options->sourceMapPath)->toBe('/tmp/style.map');
 });
 
@@ -171,6 +173,7 @@ it('setOptions with Options object stores it directly', function () {
     $options = new Options(
         syntax: 'sass',
         style: 'compressed',
+        optimizeCss: false,
         includeSources: true,
         sourceMapPath: '/tmp/style.map',
     );
@@ -182,6 +185,7 @@ it('setOptions with Options object stores it directly', function () {
     expect($stored)->toBeInstanceOf(Options::class)
         ->and($stored->syntax)->toBe('sass')
         ->and($stored->style)->toBe('compressed')
+        ->and($stored->optimizeCss)->toBeFalse()
         ->and($stored->includeSources)->toBeTrue()
         ->and($stored->sourceMapPath)->toBe('/tmp/style.map');
 });
@@ -204,16 +208,18 @@ it('setOptions with Options object does not trigger a deprecation notice', funct
 it('method-level Options override compiler defaults', function () {
     $this->compiler->setOptions(new Options(
         style: 'expanded',
+        optimizeCss: true,
         includeSources: true,
     ));
 
     $resolved = (fn() => array_merge(
         $this->resolveOptions(),
-        $this->resolveOptions(new Options(style: 'compressed'))
+        $this->resolveOptions(new Options(style: 'compressed', optimizeCss: false))
     ))->call($this->compiler);
 
     expect($resolved)->toBe([
         'style' => 'compressed',
+        'optimizeCss' => false,
         'includeSources' => true,
     ]);
 });

@@ -9,6 +9,7 @@ it('has null properties when constructed with no arguments', function () {
 
     expect($options->syntax)->toBeNull()
         ->and($options->style)->toBeNull()
+        ->and($options->optimizeCss)->toBeNull()
         ->and($options->includeSources)->toBeNull()
         ->and($options->loadPaths)->toBeNull()
         ->and($options->quietDeps)->toBeNull()
@@ -26,6 +27,10 @@ it('stores syntax via constructor', function () {
 
 it('stores style via constructor', function () {
     expect((new Options(style: 'compressed'))->style)->toBe('compressed');
+});
+
+it('stores optimizeCss via constructor', function () {
+    expect((new Options(optimizeCss: false))->optimizeCss)->toBeFalse();
 });
 
 it('stores includeSources via constructor', function () {
@@ -70,6 +75,7 @@ it('stores all options via constructor', function () {
     $options = new Options(
         syntax: 'scss',
         style: 'compressed',
+        optimizeCss: false,
         includeSources: false,
         loadPaths: ['/vendor/sass'],
         quietDeps: true,
@@ -83,6 +89,7 @@ it('stores all options via constructor', function () {
 
     expect($options->syntax)->toBe('scss')
         ->and($options->style)->toBe('compressed')
+        ->and($options->optimizeCss)->toBeFalse()
         ->and($options->includeSources)->toBeFalse()
         ->and($options->loadPaths)->toBe(['/vendor/sass'])
         ->and($options->quietDeps)->toBeTrue()

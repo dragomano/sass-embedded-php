@@ -46,8 +46,8 @@ it('compiles with inline sourceMapPath', function () {
     $scss = '$color: blue; .box { color: $color; }';
 
     $css = $this->compiler->compileInPersistentMode($scss, new Options(
-        sourceMapPath: 'inline',
         includeSources: true,
+        sourceMapPath: 'inline'
     ));
 
     expect($css)->toMatch('/\/\*# sourceMappingURL=data:application\/json;base64,/');
@@ -76,8 +76,8 @@ it('compiles with sourceMapPath enabled', function () {
     }
 
     $css = $this->compiler->compileInPersistentMode($scss, new Options(
-        sourceMapPath: $mapPath,
         includeSources: true,
+        sourceMapPath: $mapPath
     ));
 
     expect($css)->toContain('/*# sourceMappingURL=feature.map */')
@@ -182,4 +182,21 @@ it('preserves only important comments in compressed mode', function () {
         ->and($css)->not()->toContain('// single line comment')
         ->and($css)->toContain('/*! important comment */')
         ->and($css)->toContain('.test{color:red}');
+});
+
+it('can disable Lightning CSS optimization for compressed output', function () {
+    $scss = <<<'SCSS'
+    .test {
+        color: rgba(255, 255, 0, 0.8);
+    }
+    SCSS;
+
+    $optimizedCss = $this->compiler->compileInPersistentMode($scss, new Options(style: 'compressed'));
+    $sassOnlyCss = $this->compiler->compileInPersistentMode($scss, new Options(
+        style: 'compressed',
+        optimizeCss: false,
+    ));
+
+    expect($optimizedCss)->toBe('.test{color:#ff0c}')
+        ->and($sassOnlyCss)->toBe('.test{color:rgba(255,255,0,.8)}');
 });

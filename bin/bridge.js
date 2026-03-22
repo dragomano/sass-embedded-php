@@ -211,6 +211,7 @@ function compilePayload(payload) {
   const options = payload.options || {};
   const url = payload.url ? new URL(String(payload.url)) : undefined;
   const compileOpts = {};
+  const shouldOptimizeCss = !('optimizeCss' in options) || options.optimizeCss !== false;
 
   if (url) compileOpts.url = url;
 
@@ -250,7 +251,10 @@ function compilePayload(payload) {
   const normalizedSourceMap = result.sourceMap ? normalizeSourceMap(result.sourceMap, options) : undefined;
   const shouldMinify = options.minimize || ('compressed' in options && options.compressed) || options.style === 'compressed';
 
-  const optimized = optimizeCss(result.css, normalizedSourceMap, options, shouldMinify);
+  const optimized = shouldOptimizeCss
+    ? optimizeCss(result.css, normalizedSourceMap, options, shouldMinify)
+    : { css: result.css, sourceMap: normalizedSourceMap };
+
   let finalCss = optimized.css;
   const finalSourceMap = optimized.sourceMap;
 

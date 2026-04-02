@@ -211,7 +211,10 @@ function compilePayload(payload) {
   const options = payload.options || {};
   const url = payload.url ? new URL(String(payload.url)) : undefined;
   const compileOpts = {};
-  const shouldOptimizeCss = !('optimizeCss' in options) || options.optimizeCss !== false;
+
+  // Disable lightningcss when generating source maps because it drops property-level mappings.
+  const shouldOptimizeCss = !options.sourceMapPath &&
+    (!('optimizeCss' in options) || options.optimizeCss !== false);
 
   if (url) compileOpts.url = url;
 
@@ -258,8 +261,8 @@ function compilePayload(payload) {
   let finalCss = optimized.css;
   const finalSourceMap = optimized.sourceMap;
 
-  // Remove empty lines if requested
-  if (options.removeEmptyLines && !shouldMinify) {
+  // Remove empty lines unless a source map is being generated, which would shift mappings.
+  if (options.removeEmptyLines && !shouldMinify && !options.sourceMapPath) {
     finalCss = finalCss.replace(/\n\n+/g, '\n');
   }
 

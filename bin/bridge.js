@@ -129,9 +129,10 @@ function normalizeSourceMap(sourceMap, options) {
     }
 
     map.sources = sources;
-    if (sourcesContent.length > 0) {
+    // Only include sourcesContent when explicitly requested
+    if (options.includeSources === true && sourcesContent.length > 0) {
       map.sourcesContent = sourcesContent;
-    } else if (!('includeSources' in options) || options.includeSources === false) {
+    } else {
       delete map.sourcesContent;
     }
   }
@@ -228,10 +229,7 @@ function compilePayload(payload) {
 
   if (options.sourceMapPath) {
     compileOpts.sourceMap = true;
-
-    if ('includeSources' in options && options.includeSources) {
-      compileOpts.sourceMapIncludeSources = options.includeSources;
-    }
+    compileOpts.sourceMapIncludeSources = ('includeSources' in options && options.includeSources === true);
   }
 
   if (options.loadPaths) {

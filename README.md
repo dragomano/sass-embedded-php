@@ -5,16 +5,7 @@
 
 [По-русски](README.ru.md)
 
-PHP wrapper for [sass-embedded](https://npmx.dev/package/sass-embedded) (Dart Sass via Node.js).
-
-Allows compiling SCSS/SASS to CSS through PHP using Node.js and npm.
-
----
-
-## Requirements
-
-- PHP >= 8.2
-- Node.js >= 18
+Allows compiling SCSS/SASS to CSS through PHP using native Dart Sass.
 
 ---
 
@@ -187,27 +178,24 @@ echo $css;
 
 ## Options
 
-Paths to bridge.js and Node are specified only through the constructor:
+The compiler uses the native Dart Sass binary installed into the package automatically:
 
 ```php
-$compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
+$compiler = new Compiler();
 ```
 
 | Option              | Type          | Description                                                | Possible values                                | Default                                             |
 |---------------------|---------------|------------------------------------------------------------|------------------------------------------------|-----------------------------------------------------|
 | syntax              | string        | Input syntax                                               | 'scss' for SCSS, 'indented' or 'sass' for SASS | `scss`                                              |
 | style               | string        | Output style                                               | 'compressed' or 'expanded'                     | `expanded`                                          |
-| optimizeCss         | bool          | Enables post-processing and minification via Lightning CSS | true or false                                  | `true`                                              |
 | includeSources      | bool          | Include source code in map                                 | true or false                                  | `false`                                             |
 | loadPaths           | array<string> | Array of paths for searching Sass imports                  | `['./libs', './node_modules']`                 | `[]`                                                |
 | quietDeps           | bool          | Suppresses warnings from dependencies                      | true or false                                  | `false`                                             |
 | silenceDeprecations | array<string> | Suppresses warnings about specific deprecations            | `['import', 'color-functions']`                | `[]`                                                |
 | verbose             | bool          | Enables verbose output of messages                         | true or false                                  | `false`                                             |
-| removeEmptyLines    | bool          | Removes extra empty lines in non-compressed output         | true or false                                  | `false`                                             |
 | sourceMapPath       | string        | `inline`, URL, directory, or file path for source map      |                                                | disabled                                            |
 | url                 | string        | Sets the source URL used by Sass and source maps           | file or HTTP(S) URL                            | auto in `compileFile()`, unset in `compileString()` |
 | sourceFile          | string        | Sets the virtual source filename for bridge processing     | e.g. `style.scss`                              | internal bridge default                             |
-| streamResult        | bool          | Returns large compilation results as chunks                | true or false                                  | `false`                                             |
 
 Options are passed only as an `Options` object, either for the entire compiler or for a specific method call:
 
@@ -217,13 +205,11 @@ use Bugo\Sass\Options;
 $compiler->setOptions(new Options(
     syntax: 'indented',
     style: 'compressed',
-    optimizeCss: true,
     sourceMapPath: '/out/style.map',
 ));
 
 $css = $compiler->compileString($scss, new Options(
     style: 'compressed',
-    optimizeCss: false,
     sourceMapPath: 'inline',
 ));
 ```

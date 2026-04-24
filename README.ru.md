@@ -5,16 +5,7 @@
 
 [English](README.md)
 
-PHP-обёртка для [sass-embedded](https://npmx.dev/package/sass-embedded) (Dart Sass через Node.js).
-
-Позволяет компилировать SCSS/SASS в CSS через PHP, используя Node.js и npm.
-
----
-
-## Требования
-
-- PHP >= 8.2
-- Node.js >= 18
+Позволяет компилировать SCSS/SASS в CSS через PHP, используя нативный Dart Sass.
 
 ---
 
@@ -187,27 +178,24 @@ echo $css;
 
 ## Параметры
 
-Пути к bridge.js и Node указываются только через конструктор:
+Компилятор использует нативный бинарник Dart Sass, который устанавливается в пакет автоматически:
 
 ```php
-$compiler = new Compiler('/path/to/bridge.js', '/path/to/node');
+$compiler = new Compiler();
 ```
 
 | Параметр            | Тип           | Описание                                                 | Возможные значения                              | По умолчанию                                          |
 |---------------------|---------------|----------------------------------------------------------|-------------------------------------------------|-------------------------------------------------------|
 | syntax              | string        | Синтаксис входного файла                                 | 'scss' для SCSS, 'indented' или 'sass' для SASS | `scss`                                                |
 | style               | string        | Стиль вывода                                             | 'compressed' или 'expanded'                     | `expanded`                                            |
-| optimizeCss         | bool          | Включает постобработку и минимизацию через Lightning CSS | true или false                                  | `true`                                                |
 | includeSources      | bool          | Включать исходный код в карту                            | true или false                                  | `false`                                               |
 | loadPaths           | array<string> | Массив путей для поиска импортов Sass                    | `['./libs', './node_modules']`                  | `[]`                                                  |
 | quietDeps           | bool          | Подавляет предупреждения от зависимостей                 | true или false                                  | `false`                                               |
 | silenceDeprecations | array<string> | Подавляет предупреждения об определённых устареваниях    | `['import', 'color-functions']`                 | `[]`                                                  |
 | verbose             | bool          | Включает подробный вывод сообщений                       | true или false                                  | `false`                                               |
-| removeEmptyLines    | bool          | Удаляет лишние пустые строки в не сжатом выводе          | true или false                                  | `false`                                               |
 | sourceMapPath       | string        | `inline`, URL-адрес, директория или путь к файлу карты   |                                                 | отключено                                             |
 | url                 | string        | Задаёт URL исходника для Sass и source map               | file или HTTP(S) URL                            | auto в `compileFile()`, не задано в `compileString()` |
 | sourceFile          | string        | Задаёт виртуальное имя исходного файла для bridge        | например `style.scss`                           | внутреннее значение bridge                            |
-| streamResult        | bool          | Возвращает большие результаты компиляции чанками         | true или false                                  | `false`                                               |
 
 Параметры передаются только через объект `Options`: либо для всего компилятора, либо для конкретного вызова метода:
 
@@ -217,13 +205,11 @@ use Bugo\Sass\Options;
 $compiler->setOptions(new Options(
     syntax: 'indented',
     style: 'compressed',
-    optimizeCss: true,
     sourceMapPath: '/out/style.map',
 ));
 
 $css = $compiler->compileString($scss, new Options(
     style: 'compressed',
-    optimizeCss: false,
     sourceMapPath: 'inline',
 ));
 ```

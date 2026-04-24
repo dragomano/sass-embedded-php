@@ -16,22 +16,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
 
-      - name: Install Node.js dependencies
-        run: npm install
-
       - name: Install dependencies
         run: composer install
 
-      - name: Run Rector checks
-        run: composer run check
+      - name: Run fixes
+        run: composer fix
 
+      - name: Run rector
+        run: composer rector
+  
       - name: Run tests
         run: vendor/bin/pest --colors=always --coverage-clover build/logs/clover.xml
 

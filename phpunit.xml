@@ -13,8 +13,5 @@
         <include>
             <directory>src</directory>
         </include>
-        <exclude>
-            <file>src/Plugin.php</file>
-        </exclude>
     </source>
 </phpunit>

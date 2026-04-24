@@ -14,22 +14,33 @@ use Composer\Script\Event;
 use Composer\Script\ScriptEvents;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use ZipArchive;
 
-use function copy;
+use function basename;
+use function file_get_contents;
+use function file_put_contents;
+use function implode;
 use function is_dir;
 use function is_file;
+use function json_decode;
+use function ltrim;
 use function mkdir;
+use function php_uname;
 use function realpath;
-use function rtrim;
+use function rename;
+use function rmdir;
+use function scandir;
 use function sprintf;
-use function strtoupper;
-use function substr;
-
-use const DIRECTORY_SEPARATOR;
+use function stream_context_create;
+use function unlink;
 
 class Plugin implements PluginInterface, EventSubscriberInterface
 {
     private const PACKAGE_NAME = 'sass-embedded-php';
+
+    private const GITHUB_API_URL = 'https://api.github.com/repos/sass/dart-sass/releases/latest';
+
+    private const SASS_BASE_URL = 'https://github.com/sass/dart-sass/releases/download';
 
     private string $packagePath = '';
 
@@ -70,7 +81,14 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $this->runInstall($event->getIO());
     }
 
-    private function ensureInitializedFromComposer(?Composer $composer): void
+    public static function installBinary(Event $event): void
+    {
+        $plugin = new self();
+        $plugin->ensureInitializedFromComposer($event->getComposer());
+        $plugin->runInstall($event->getIO());
+    }
+
+    protected function ensureInitializedFromComposer(?Composer $composer): void
     {
         if ($this->packagePath === '') {
             $this->packagePath = (string) realpath(__DIR__ . '/../');
@@ -81,7 +99,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         }
     }
 
-    private function runInstall(IOInterface $io): void
+    protected function runInstall(IOInterface $io): void
     {
         static $alreadyRun = false;
 
@@ -91,133 +109,279 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
         $alreadyRun = true;
 
-        $this->installNpm($io);
-        $this->copyBinary($io);
+        $this->downloadNativeSass($io);
     }
 
-    private function installNpm(IOInterface $io): void
+    protected function getOsFamily(): string
     {
-        if ($this->packagePath === '' || ! is_dir($this->packagePath)) {
+        return PHP_OS_FAMILY;
+    }
+
+    protected function getMachine(): string
+    {
+        return php_uname('m');
+    }
+
+    protected function detectPlatform(): string
+    {
+        $osFamily = $this->getOsFamily();
+
+        $os = match ($osFamily) {
+            'Windows' => 'windows',
+            'Darwin'  => 'macos',
+            'Linux'   => 'linux',
+            default   => throw new RuntimeException('Unsupported OS: ' . $osFamily),
+        };
+
+        $arch = match ($this->getMachine()) {
+            'aarch64',
+            'arm64'  => 'arm64',
+            'armv7l' => 'arm',
+            default  => 'x64',
+        };
+
+        return $os . '-' . $arch;
+    }
+
+    protected function fetchUrl(string $url): string|false
+    {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => implode("\r\n", [
+                    'Accept: application/vnd.github+json',
+                    'User-Agent: sass-embedded-php',
+                ]) . "\r\n",
+            ],
+        ]);
+
+        return file_get_contents($url, false, $context);
+    }
+
+    protected function getLatestVersion(): string
+    {
+        $response = $this->fetchUrl(self::GITHUB_API_URL);
+
+        if ($response === false) {
+            throw new RuntimeException('Failed to fetch latest Dart Sass version from GitHub');
+        }
+
+        $data = json_decode($response, true);
+
+        if (! isset($data['tag_name'])) {
+            throw new RuntimeException('Invalid GitHub API response');
+        }
+
+        return ltrim((string) $data['tag_name'], 'v');
+    }
+
+    protected function getPackagePath(): string
+    {
+        return $this->packagePath;
+    }
+
+    protected function downloadNativeSass(IOInterface $io): void
+    {
+        $targetDir = $this->getPackagePath() . '/bin';
+
+        if ($this->isNativeSassInstalled($targetDir)) {
             $io->write(sprintf(
-                '<warning>[%s]</warning> package directory not found, skipping npm install.',
+                '<info>[%s]</info> Native Dart Sass already installed.',
                 self::PACKAGE_NAME
             ));
 
             return;
         }
 
-        $packageJson = $this->packagePath . '/package.json';
-
-        if (! is_file($packageJson)) {
-            $io->write(sprintf(
-                '<warning>[%s]</warning> package.json not found in %s, skipping npm install.',
-                self::PACKAGE_NAME,
-                $this->packagePath
-            ));
-
-            return;
-        }
-
-        $npmBin = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') ? 'npm.cmd' : 'npm';
-
-        $check = new Process([$npmBin, '--version']);
-        $check->setTimeout(10);
-
-        try {
-            $check->run();
-        } catch (RuntimeException $runtimeException) {
-            $io->write(sprintf(
-                '<warning>[%s]</warning> failed to execute "%s --version": %s',
-                self::PACKAGE_NAME,
-                $npmBin,
-                $runtimeException->getMessage()
-            ));
-
-            return;
-        }
-
-        if (! $check->isSuccessful()) {
-            $io->write(sprintf(
-                '<warning>[%s]</warning> npm not found in PATH or not executable, skipping npm install.',
-                self::PACKAGE_NAME
-            ));
-
-            return;
-        }
-
-        $nodeModules = $this->packagePath . '/node_modules/sass-embedded';
-
-        if (is_dir($nodeModules)) {
-            $io->write(sprintf(
-                '<info>[%s]</info> node_modules/sass-embedded already exists, skipping npm install.',
-                self::PACKAGE_NAME
-            ));
-
-            return;
-        }
-
-        $process = new Process([$npmBin, 'install'], $this->packagePath);
-        $process->setTimeout(300);
+        $version     = $this->getLatestVersion();
+        $platform    = $this->detectPlatform();
+        $extension   = $this->getOsFamily() === 'Windows' ? 'zip' : 'tar.gz';
+        $filename    = "dart-sass-$version-$platform.$extension";
+        $url         = self::SASS_BASE_URL . "/$version/$filename";
+        $archivePath = $targetDir . '/' . $filename;
 
         $io->write(sprintf(
-            '<info>[%s]</info> running "npm install" in %s',
+            '<info>[%s]</info> Downloading Dart Sass %s for %s...',
             self::PACKAGE_NAME,
-            $this->packagePath
+            $version,
+            $platform
         ));
 
-        $process->run(function (string $type, string $buffer) use ($io): void {
-            $io->write($buffer);
-        });
-
-        if ($process->isSuccessful()) {
-            $io->write(sprintf(
-                '<info>[%s]</info> npm install completed successfully.',
-                self::PACKAGE_NAME
-            ));
-
-            return;
+        if (! is_dir($targetDir)) {
+            mkdir($targetDir, 0777, true);
         }
+
+        $this->downloadFile($url, $archivePath);
 
         $io->write(sprintf(
-            '<error>[%s]</error> npm install failed:',
-            self::PACKAGE_NAME
+            '<info>[%s]</info> Extracting %s...',
+            self::PACKAGE_NAME,
+            $filename
         ));
 
-        $io->write($process->getErrorOutput());
+        $this->extractArchive($archivePath, $targetDir);
+        $this->flattenExtractedSass($targetDir);
+
+        unlink($archivePath);
+
+        $io->write(sprintf(
+            '<info>[%s]</info> Native Dart Sass %s installed successfully.',
+            self::PACKAGE_NAME,
+            $version
+        ));
     }
 
-    private function copyBinary(IOInterface $io): void
+    protected function isNativeSassInstalled(string $targetDir): bool
     {
-        $source    = $this->packagePath . '/bin/bridge.js';
-        $targetDir = rtrim($this->binDir, '/\\');
-        $target    = $targetDir . DIRECTORY_SEPARATOR . 'bridge.js';
+        if ($this->getOsFamily() === 'Windows') {
+            return is_file($targetDir . '/sass.bat')
+                && is_file($targetDir . '/src/dart.exe')
+                && is_file($targetDir . '/src/sass.snapshot');
+        }
 
-        if (! is_file($source)) {
-            $io->write(sprintf(
-                '<warning>[%s]</warning> binary not found in package (%s), skipping copy.',
-                self::PACKAGE_NAME,
-                $source
-            ));
+        return is_file($targetDir . '/sass')
+            && is_file($targetDir . '/src/dart')
+            && is_file($targetDir . '/src/sass.snapshot');
+    }
+
+    protected function downloadFile(string $url, string $targetPath): void
+    {
+        $result = $this->fetchFileContent($url);
+
+        if ($result === false) {
+            throw new RuntimeException('Failed to download Dart Sass from: ' . $url);
+        }
+
+        file_put_contents($targetPath, $result);
+    }
+
+    protected function fetchFileContent(string $url): string|false
+    {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => "User-Agent: sass-embedded-php\r\n",
+            ],
+            'ssl' => [
+                'verify_peer'      => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+
+        return file_get_contents($url, false, $context);
+    }
+
+    protected function extractArchive(string $archivePath, string $targetDir): void
+    {
+        if ($this->getOsFamily() === 'Windows') {
+            $zip    = new ZipArchive();
+            $result = $zip->open($archivePath);
+
+            if ($result !== true) {
+                throw new RuntimeException('Failed to open ZIP archive: code ' . $result);
+            }
+
+            $zip->extractTo($targetDir);
+            $zip->close();
+        } else {
+            $process = $this->createTarProcess($archivePath, $targetDir);
+            $process->run();
+
+            if (! $process->isSuccessful()) {
+                throw new RuntimeException('Failed to extract archive: ' . $process->getErrorOutput());
+            }
+        }
+    }
+
+    protected function createTarProcess(string $archivePath, string $targetDir): Process
+    {
+        return new Process(['tar', '-xzf', $archivePath, '-C', $targetDir]);
+    }
+
+    protected function flattenExtractedSass(string $targetDir): void
+    {
+        $sourceDir = $targetDir . '/dart-sass';
+
+        if (! is_dir($sourceDir)) {
+            return;
+        }
+
+        $entries = $this->scandirPath($sourceDir);
+
+        if ($entries === false) {
+            throw new RuntimeException('Failed to read extracted Dart Sass directory');
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            $source = $sourceDir . '/' . $entry;
+            $target = $targetDir . '/' . basename((string) $entry);
+
+            $this->removePath($target);
+
+            if (! $this->renamePath($source, $target)) {
+                throw new RuntimeException('Failed to move extracted file: ' . $entry);
+            }
+        }
+
+        if (! $this->rmdirPath($sourceDir)) {
+            throw new RuntimeException('Failed to remove temporary Dart Sass directory');
+        }
+    }
+
+    protected function scandirPath(string $path): array|false
+    {
+        return scandir($path);
+    }
+
+    protected function renamePath(string $from, string $to): bool
+    {
+        return rename($from, $to);
+    }
+
+    protected function rmdirPath(string $path): bool
+    {
+        return rmdir($path);
+    }
+
+    protected function unlinkPath(string $path): bool
+    {
+        return unlink($path);
+    }
+
+    protected function removePath(string $path): void
+    {
+        if (is_file($path)) {
+            if (! $this->unlinkPath($path)) {
+                throw new RuntimeException('Failed to remove file: ' . $path);
+            }
 
             return;
         }
 
-        if (! is_dir($this->binDir)) {
-            @mkdir($this->binDir, 0777, true);
+        if (! is_dir($path)) {
+            return;
         }
 
-        if (@copy($source, $target)) {
-            $io->write(sprintf(
-                '<info>[%s]</info> Binary copied: %s',
-                self::PACKAGE_NAME,
-                $target
-            ));
-        } else {
-            $io->write(sprintf(
-                '<error>[%s]</error> Failed to copy binary to %s',
-                self::PACKAGE_NAME,
-                $target
-            ));
+        $entries = $this->scandirPath($path);
+
+        if ($entries === false) {
+            throw new RuntimeException('Failed to read directory: ' . $path);
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            $this->removePath($path . '/' . $entry);
+        }
+
+        if (! $this->rmdirPath($path)) {
+            throw new RuntimeException('Failed to remove directory: ' . $path);
         }
     }
 }

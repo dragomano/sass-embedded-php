@@ -9,13 +9,11 @@ it('has null properties when constructed with no arguments', function () {
 
     expect($options->syntax)->toBeNull()
         ->and($options->style)->toBeNull()
-        ->and($options->optimizeCss)->toBeNull()
         ->and($options->includeSources)->toBeNull()
         ->and($options->loadPaths)->toBeNull()
         ->and($options->quietDeps)->toBeNull()
         ->and($options->silenceDeprecations)->toBeNull()
         ->and($options->verbose)->toBeNull()
-        ->and($options->removeEmptyLines)->toBeNull()
         ->and($options->sourceMapPath)->toBeNull()
         ->and($options->url)->toBeNull()
         ->and($options->sourceFile)->toBeNull();
@@ -27,10 +25,6 @@ it('stores syntax via constructor', function () {
 
 it('stores style via constructor', function () {
     expect((new Options(style: 'compressed'))->style)->toBe('compressed');
-});
-
-it('stores optimizeCss via constructor', function () {
-    expect((new Options(optimizeCss: false))->optimizeCss)->toBeFalse();
 });
 
 it('stores includeSources via constructor', function () {
@@ -52,10 +46,6 @@ it('stores silenceDeprecations via constructor', function () {
 
 it('stores verbose via constructor', function () {
     expect((new Options(verbose: true))->verbose)->toBeTrue();
-});
-
-it('stores removeEmptyLines via constructor', function () {
-    expect((new Options(removeEmptyLines: true))->removeEmptyLines)->toBeTrue();
 });
 
 it('stores sourceMapPath via constructor', function () {

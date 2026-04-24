@@ -1,6 +1,6 @@
 {
   "name": "bugo/sass-embedded-php",
-  "description": "A lightweight PHP bridge for the official Node.js Sass embedded package",
+  "description": "A lightweight PHP bridge for native Dart Sass",
   "type": "composer-plugin",
   "license": "MIT",
   "authors": [
@@ -13,12 +13,14 @@
     "scss php",
     "sass php",
     "scss compiler",
-    "sass compiler"
+    "sass compiler",
+    "dart sass"
   ],
   "require": {
     "php": "^8.2",
     "composer-plugin-api": "^2.0",
-    "symfony/process": "^7.4|^8.0"
+    "symfony/process": "^7.4|^8.0",
+    "ext-zip": "*"
   },
   "require-dev": {
     "bugo/scss-benchmark-utils": "dev-main",
@@ -27,7 +29,7 @@
     "mockery/mockery": "dev-bugfix/spy-generics",
     "pestphp/pest": "^3.8|^4.4",
     "rector/rector": "^2.3",
-    "mikey179/vfsstream": "^1.6"
+    "scssphp/scssphp": "^2.1"
   },
   "autoload": {
     "psr-4": {
@@ -35,8 +37,12 @@
     }
   },
   "scripts": {
+    "install-binary": "Bugo\\Sass\\Plugin::installBinary",
+    "post-install-cmd": "@install-binary",
+    "post-update-cmd": "@install-binary",
     "fix": "vendor/bin/php-cs-fixer fix",
     "check": "vendor/bin/rector process --dry-run --clear-cache",
+    "rector": "vendor/bin/rector process",
     "benchmark": "php benchmark.php",
     "test": "vendor/bin/pest --colors=always",
     "test-coverage": "vendor/bin/pest --colors=always --coverage --min=100",
@@ -46,9 +52,6 @@
   "extra": {
     "class": "Bugo\\Sass\\Plugin"
   },
-  "bin": [
-    "bin/bridge.js"
-  ],
   "config": {
     "optimize-autoloader": true,
     "preferred-install": "dist",

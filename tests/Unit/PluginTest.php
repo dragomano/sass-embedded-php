@@ -12,6 +12,7 @@ use Composer\IO\IOInterface;
 use Composer\Plugin\PluginInterface;
 use Composer\Script\Event;
 use Composer\Script\ScriptEvents;
+use Symfony\Component\Process\Process;
 
 function makePluginWithPlatform(string $osFamily, string $machine): Plugin
 {
@@ -110,6 +111,32 @@ function makePluginForRemove(array $overrides = []): Plugin
         public function exposeRemovePath(string $path): void
         {
             $this->removePath($path);
+        }
+    };
+}
+
+function makePluginForFetchUrl(?Composer $composer, ?IOInterface $io): Plugin
+{
+    return new class ($composer, $io) extends Plugin {
+        public array $capturedContextOptions = [];
+
+        public function __construct(?Composer $composer, ?IOInterface $io)
+        {
+            if ($composer !== null && $io !== null) {
+                $this->activate($composer, $io);
+            }
+        }
+
+        protected function doFileGetContents(string $url, mixed $context): string|false
+        {
+            $this->capturedContextOptions = stream_context_get_options($context);
+
+            return '{"tag_name":"v1.0.0"}';
+        }
+
+        public function exposeFetchUrl(string $url): string|false
+        {
+            return $this->fetchUrl($url);
         }
     };
 }
@@ -568,7 +595,10 @@ it('downloadNativeSass on Windows extracts zip and flattens dart-sass directory'
 
     $files = [];
     if (is_dir($targetDir)) {
-        $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($targetDir, FilesystemIterator::SKIP_DOTS));
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($targetDir, FilesystemIterator::SKIP_DOTS)
+        );
+
         foreach ($it as $f) {
             $files[] = $f->getPathname();
         }
@@ -677,19 +707,19 @@ it('extractArchive on Unix runs tar and succeeds', function () {
 
     mkdir($targetDir, 0777, true);
 
-    $process = Mockery::mock(Symfony\Component\Process\Process::class);
+    $process = Mockery::mock(Process::class);
     $process->shouldReceive('run')->once();
     $process->shouldReceive('isSuccessful')->once()->andReturn(true);
 
     $plugin = new class ($process) extends Plugin {
-        public function __construct(private readonly Symfony\Component\Process\Process $fakeProcess) {}
+        public function __construct(private readonly Process $fakeProcess) {}
 
         protected function getOsFamily(): string
         {
             return 'Linux';
         }
 
-        protected function createTarProcess(string $archivePath, string $targetDir): Symfony\Component\Process\Process
+        protected function createTarProcess(string $archivePath, string $targetDir): Process
         {
             return $this->fakeProcess;
         }
@@ -709,20 +739,20 @@ it('extractArchive on Unix runs tar and succeeds', function () {
 });
 
 it('extractArchive on Unix throws when tar fails', function () {
-    $process = Mockery::mock(Symfony\Component\Process\Process::class);
+    $process = Mockery::mock(Process::class);
     $process->shouldReceive('run')->once();
     $process->shouldReceive('isSuccessful')->once()->andReturn(false);
     $process->shouldReceive('getErrorOutput')->once()->andReturn('tar: file not found');
 
     $plugin = new class ($process) extends Plugin {
-        public function __construct(private readonly Symfony\Component\Process\Process $fakeProcess) {}
+        public function __construct(private readonly Process $fakeProcess) {}
 
         protected function getOsFamily(): string
         {
             return 'Linux';
         }
 
-        protected function createTarProcess(string $archivePath, string $targetDir): Symfony\Component\Process\Process
+        protected function createTarProcess(string $archivePath, string $targetDir): Process
         {
             return $this->fakeProcess;
         }
@@ -833,9 +863,46 @@ it('isNativeSassInstalled returns false on Unix when files are missing', functio
     rmdir($dir);
 });
 
+it('fetchUrl adds Authorization header when composer provides github-oauth token', function () {
+    $config   = Mockery::mock(Config::class);
+    $composer = Mockery::mock(Composer::class);
+    $io       = Mockery::mock(IOInterface::class);
+
+    $config->shouldReceive('get')->with('bin-dir')->andReturn('vendor/bin');
+    $config->shouldReceive('get')->with('github-oauth')->andReturn(['github.com' => 'my-secret-token']);
+    $composer->shouldReceive('getConfig')->andReturn($config);
+
+    $plugin = makePluginForFetchUrl($composer, $io);
+    $plugin->exposeFetchUrl('https://api.github.com/repos/sass/dart-sass/releases/latest');
+
+    expect($plugin->capturedContextOptions['http']['header'])->toContain('Authorization: Bearer my-secret-token');
+
+    Mockery::close();
+});
+
+it('fetchUrl adds Authorization header when GITHUB_TOKEN env variable is set', function () {
+    putenv('GITHUB_TOKEN=env-token-123');
+
+    $plugin = makePluginForFetchUrl(null, null);
+    $plugin->exposeFetchUrl('https://api.github.com/repos/sass/dart-sass/releases/latest');
+
+    putenv('GITHUB_TOKEN');
+
+    expect($plugin->capturedContextOptions['http']['header'])->toContain('Authorization: Bearer env-token-123');
+});
+
+it('fetchUrl does not add Authorization header when no token is available', function () {
+    putenv('GITHUB_TOKEN');
+
+    $plugin = makePluginForFetchUrl(null, null);
+    $plugin->exposeFetchUrl('https://api.github.com/repos/sass/dart-sass/releases/latest');
+
+    expect($plugin->capturedContextOptions['http']['header'])->not->toContain('Authorization');
+});
+
 it('createTarProcess returns a Process configured with tar command', function () {
     $plugin = new class () extends Plugin {
-        public function exposeCreateTarProcess(string $archivePath, string $targetDir): Symfony\Component\Process\Process
+        public function exposeCreateTarProcess(string $archivePath, string $targetDir): Process
         {
             return $this->createTarProcess($archivePath, $targetDir);
         }
@@ -843,6 +910,6 @@ it('createTarProcess returns a Process configured with tar command', function ()
 
     $process = $plugin->exposeCreateTarProcess('/tmp/sass.tar.gz', '/tmp/target');
 
-    expect($process)->toBeInstanceOf(Symfony\Component\Process\Process::class)
+    expect($process)->toBeInstanceOf(Process::class)
         ->and($process->getCommandLine())->toContain('tar');
 });

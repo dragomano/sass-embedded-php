@@ -19,6 +19,7 @@ use ZipArchive;
 use function basename;
 use function file_get_contents;
 use function file_put_contents;
+use function getenv;
 use function implode;
 use function is_dir;
 use function is_file;
@@ -42,16 +43,17 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
     private const SASS_BASE_URL = 'https://github.com/sass/dart-sass/releases/download';
 
+    private ?Composer $composer = null;
+
     private string $packagePath = '';
 
     private string $binDir = '';
 
     public function activate(Composer $composer, IOInterface $io): void
     {
-        $config = $composer->getConfig();
-
+        $this->composer    = $composer;
         $this->packagePath = (string) realpath(__DIR__ . '/../');
-        $this->binDir      = (string) $config->get('bin-dir');
+        $this->binDir      = (string) $composer->getConfig()->get('bin-dir');
     }
 
     public function deactivate(Composer $composer, IOInterface $io): void {}
@@ -145,16 +147,36 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
     protected function fetchUrl(string $url): string|false
     {
+        $headers = [
+            'Accept: application/vnd.github+json',
+            'User-Agent: sass-embedded-php',
+        ];
+
+        $token = null;
+
+        if ($this->composer !== null) {
+            $authConfig = $this->composer->getConfig()->get('github-oauth');
+            $token      = $authConfig['github.com'] ?? null;
+        }
+
+        $token ??= getenv('GITHUB_TOKEN') ?: null;
+
+        if ($token) {
+            $headers[] = 'Authorization: Bearer ' . $token;
+        }
+
         $context = stream_context_create([
             'http' => [
                 'method' => 'GET',
-                'header' => implode("\r\n", [
-                    'Accept: application/vnd.github+json',
-                    'User-Agent: sass-embedded-php',
-                ]) . "\r\n",
+                'header' => implode("\r\n", $headers) . "\r\n",
             ],
         ]);
 
+        return $this->doFileGetContents($url, $context);
+    }
+
+    protected function doFileGetContents(string $url, mixed $context): string|false
+    {
         return file_get_contents($url, false, $context);
     }
 
@@ -268,7 +290,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             ],
         ]);
 
-        return file_get_contents($url, false, $context);
+        return $this->doFileGetContents($url, $context);
     }
 
     protected function extractArchive(string $archivePath, string $targetDir): void

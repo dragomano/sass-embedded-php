@@ -145,6 +145,10 @@ class Compiler implements CompilerInterface
     {
         $args = [];
 
+        if (($opts['syntax'] ?? null) === 'indented') {
+            $args[] = '--indented';
+        }
+
         if ($opts['style'] ?? null) {
             $args[] = '--style=' . $opts['style'];
         }

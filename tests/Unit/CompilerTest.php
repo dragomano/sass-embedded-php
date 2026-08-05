@@ -16,6 +16,21 @@ it('returns empty css for empty string input in compileString', function () {
     expect($css)->toBe('');
 });
 
+it('compiles indented syntax in compileString', function () {
+    $css = <<<'SASS'
+    $color: red
+
+    .box
+      color: $color
+    SASS;
+
+    $expected = ".box {\n  color: red;\n}";
+
+    $result = $this->compiler->compileString($css, new Options(syntax: 'indented'));
+
+    expect($result)->toBe($expected);
+});
+
 it('returns the options set via setOptions as Options object', function () {
     $this->compiler->setOptions(new Options(
         syntax: 'sass',

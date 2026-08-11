@@ -14,8 +14,19 @@ declare(strict_types=1);
  *   --if-missing                          # skip download if spec/ already exists
  */
 
-$ref         = $argv[1] ?? 'main';
-$ifMissing   = in_array('--if-missing', $argv, true);
+$ref       = 'main';
+$ifMissing = false;
+
+foreach (array_slice($argv, 1) as $arg) {
+    if ($arg === '--if-missing') {
+        $ifMissing = true;
+
+        continue;
+    }
+
+    $ref = $arg;
+}
+
 $projectRoot = dirname(__DIR__);
 $tempDir     = sys_get_temp_dir() . '/sass-spec-' . bin2hex(random_bytes(8));
 $specDir     = $projectRoot . '/spec';

@@ -38,13 +38,25 @@
   },
   "scripts": {
     "install-binary": "Bugo\\Sass\\Plugin::installBinary",
-    "post-install-cmd": "@install-binary",
-    "post-update-cmd": "@install-binary",
+    "post-install-cmd": [
+      "@install-binary",
+      "php scripts/update-spec.php --if-missing"
+    ],
+    "post-update-cmd": [
+      "@install-binary",
+      "php scripts/update-spec.php --if-missing"
+    ],
+    "update-spec": "php scripts/update-spec.php",
     "fix": "vendor/bin/php-cs-fixer fix",
     "check": "vendor/bin/rector process --dry-run --clear-cache",
     "rector": "vendor/bin/rector process",
     "benchmark": "php benchmark.php",
     "test": "vendor/bin/pest --colors=always",
+    "test-spec": [
+      "@putenv RUN_SASS_SPEC=1",
+      "Composer\\Config::disableProcessTimeout",
+      "vendor/bin/pest tests/Feature/SpecTest.php --colors=always"
+    ],
     "test-coverage": "vendor/bin/pest --colors=always --coverage --min=100",
     "test-coverage-clover": "vendor/bin/pest --colors=always --min=100 --coverage-clover coverage.xml",
     "test-coverage-html": "vendor/bin/pest --colors=always --min=100 --coverage-html coverage"

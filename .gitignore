@@ -13,3 +13,7 @@ coverage/
 vendor/
 node_modules/
 examples/
+spec/
+
+style.scss
+test.php

@@ -195,11 +195,9 @@ final class EmbeddedCompiler implements CompilerInterface
             2 => ['pipe', 'w'],
         ], $this->pipes, null, null, ['bypass_shell' => true]);
 
-        // @codeCoverageIgnoreStart
         if (! is_resource($this->process)) {
             throw new RuntimeException('Unable to start the Dart Sass embedded compiler.');
         }
-        // @codeCoverageIgnoreEnd
 
         stream_set_blocking($this->pipes[0], false);
         stream_set_blocking($this->pipes[1], false);

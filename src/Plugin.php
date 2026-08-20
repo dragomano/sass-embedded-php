@@ -33,6 +33,7 @@ use function rmdir;
 use function scandir;
 use function sprintf;
 use function stream_context_create;
+use function trim;
 use function unlink;
 
 class Plugin implements PluginInterface, EventSubscriberInterface
@@ -202,11 +203,31 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         return $this->packagePath;
     }
 
+    protected function getInstalledVersion(string $targetDir): ?string
+    {
+        $versionFile = $targetDir . '/.sass-version';
+
+        if (! is_file($versionFile)) {
+            return null;
+        }
+
+        $version = trim((string) file_get_contents($versionFile));
+
+        return $version !== '' ? $version : null;
+    }
+
+    protected function saveInstalledVersion(string $targetDir, string $version): void
+    {
+        file_put_contents($targetDir . '/.sass-version', $version);
+    }
+
     protected function downloadNativeSass(IOInterface $io): void
     {
-        $targetDir = $this->getPackagePath() . '/bin';
+        $targetDir        = $this->getPackagePath() . '/bin';
+        $version          = $this->getLatestVersion();
+        $installedVersion = $this->getInstalledVersion($targetDir);
 
-        if ($this->isNativeSassInstalled($targetDir)) {
+        if ($this->isNativeSassInstalled($targetDir) && $installedVersion === $version) {
             $io->write(sprintf(
                 '<info>[%s]</info> Native Dart Sass already installed.',
                 self::PACKAGE_NAME
@@ -215,7 +236,10 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             return;
         }
 
-        $version     = $this->getLatestVersion();
+        if ($this->isNativeSassInstalled($targetDir)) {
+            $this->removePath($targetDir);
+        }
+
         $platform    = $this->detectPlatform();
         $extension   = $this->getOsFamily() === 'Windows' ? 'zip' : 'tar.gz';
         $filename    = "dart-sass-$version-$platform.$extension";
@@ -245,6 +269,8 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $this->flattenExtractedSass($targetDir);
 
         unlink($archivePath);
+
+        $this->saveInstalledVersion($targetDir, $version);
 
         $io->write(sprintf(
             '<info>[%s]</info> Native Dart Sass %s installed successfully.',

@@ -494,9 +494,19 @@ it('downloadNativeSass writes already installed message when sass is present', f
             return '';
         }
 
+        protected function getLatestVersion(): string
+        {
+            return '1.88.0';
+        }
+
         protected function isNativeSassInstalled(string $targetDir): bool
         {
             return true;
+        }
+
+        protected function getInstalledVersion(string $targetDir): ?string
+        {
+            return '1.88.0';
         }
 
         protected function runInstall(IOInterface $io): void
@@ -572,6 +582,11 @@ it('downloadNativeSass on Windows extracts zip and flattens dart-sass directory'
         protected function isNativeSassInstalled(string $targetDir): bool
         {
             return false;
+        }
+
+        protected function getInstalledVersion(string $targetDir): ?string
+        {
+            return null;
         }
 
         protected function downloadFile(string $url, string $targetPath): void
@@ -912,4 +927,199 @@ it('createTarProcess returns a Process configured with tar command', function ()
 
     expect($process)->toBeInstanceOf(Process::class)
         ->and($process->getCommandLine())->toContain('tar');
+});
+
+it('getInstalledVersion returns null when .sass-version file does not exist', function () {
+    $dir = sys_get_temp_dir() . '/sass-version-test-' . uniqid();
+
+    mkdir($dir, 0777, true);
+
+    $plugin = new class () extends Plugin {
+        public function exposeGetInstalledVersion(string $targetDir): ?string
+        {
+            return $this->getInstalledVersion($targetDir);
+        }
+    };
+
+    expect($plugin->exposeGetInstalledVersion($dir))->toBeNull();
+
+    rmdir($dir);
+});
+
+it('getInstalledVersion returns version from .sass-version file', function () {
+    $dir = sys_get_temp_dir() . '/sass-version-test-' . uniqid();
+
+    mkdir($dir, 0777, true);
+    file_put_contents($dir . '/.sass-version', '1.88.0');
+
+    $plugin = new class () extends Plugin {
+        public function exposeGetInstalledVersion(string $targetDir): ?string
+        {
+            return $this->getInstalledVersion($targetDir);
+        }
+    };
+
+    expect($plugin->exposeGetInstalledVersion($dir))->toBe('1.88.0');
+
+    unlink($dir . '/.sass-version');
+    rmdir($dir);
+});
+
+it('getInstalledVersion returns null when .sass-version file is empty', function () {
+    $dir = sys_get_temp_dir() . '/sass-version-test-' . uniqid();
+
+    mkdir($dir, 0777, true);
+    file_put_contents($dir . '/.sass-version', '');
+
+    $plugin = new class () extends Plugin {
+        public function exposeGetInstalledVersion(string $targetDir): ?string
+        {
+            return $this->getInstalledVersion($targetDir);
+        }
+    };
+
+    expect($plugin->exposeGetInstalledVersion($dir))->toBeNull();
+
+    unlink($dir . '/.sass-version');
+    rmdir($dir);
+});
+
+it('saveInstalledVersion writes version to .sass-version file', function () {
+    $dir = sys_get_temp_dir() . '/sass-version-test-' . uniqid();
+
+    mkdir($dir, 0777, true);
+
+    $plugin = new class () extends Plugin {
+        public function exposeSaveInstalledVersion(string $targetDir, string $version): void
+        {
+            $this->saveInstalledVersion($targetDir, $version);
+        }
+    };
+
+    $plugin->exposeSaveInstalledVersion($dir, '1.88.0');
+
+    expect(file_get_contents($dir . '/.sass-version'))->toBe('1.88.0');
+
+    unlink($dir . '/.sass-version');
+    rmdir($dir);
+});
+
+it('downloadNativeSass removes old files and updates when version differs', function () {
+    $baseDir   = sys_get_temp_dir() . '/sass-update-test-' . uniqid();
+    $targetDir = $baseDir . '/bin';
+
+    mkdir($targetDir . '/src', 0777, true);
+    file_put_contents($targetDir . '/.sass-version', '1.80.0');
+    file_put_contents($targetDir . '/sass.bat', 'old');
+    file_put_contents($targetDir . '/src/dart.exe', 'old');
+    file_put_contents($targetDir . '/src/sass.snapshot', 'old');
+
+    $zipPath = $targetDir . '/fake.zip';
+
+    $zip = new ZipArchive();
+    $zip->open($zipPath, ZipArchive::CREATE);
+    $zip->addFromString('dart-sass/sass', '#!/bin/sh');
+    $zip->close();
+
+    $zipContent = file_get_contents($zipPath);
+    unlink($zipPath);
+
+    $io       = Mockery::mock(IOInterface::class);
+    $composer = Mockery::mock(Composer::class);
+    $config   = Mockery::mock(Config::class);
+    $event    = Mockery::mock(Event::class);
+
+    $config->shouldReceive('get')->with('bin-dir')->andReturn('vendor/bin');
+    $composer->shouldReceive('getConfig')->andReturn($config);
+    $event->shouldReceive('getComposer')->andReturn($composer);
+    $event->shouldReceive('getIO')->andReturn($io);
+
+    $io->shouldReceive('write')->zeroOrMoreTimes();
+
+    $plugin = new class ($baseDir, $zipContent) extends Plugin {
+        public function __construct(
+            private readonly string $fakeBaseDir,
+            private readonly string $fakeZipContent,
+        ) {}
+
+        protected function getPackagePath(): string
+        {
+            return $this->fakeBaseDir;
+        }
+
+        protected function getOsFamily(): string
+        {
+            return 'Windows';
+        }
+
+        protected function getMachine(): string
+        {
+            return 'x86_64';
+        }
+
+        protected function getLatestVersion(): string
+        {
+            return '1.99.0';
+        }
+
+        protected function isNativeSassInstalled(string $targetDir): bool
+        {
+            return is_file($targetDir . '/sass.bat');
+        }
+
+        protected function getInstalledVersion(string $targetDir): ?string
+        {
+            $versionFile = $targetDir . '/.sass-version';
+
+            if (! is_file($versionFile)) {
+                return null;
+            }
+
+            return trim((string) file_get_contents($versionFile)) ?: null;
+        }
+
+        protected function downloadFile(string $url, string $targetPath): void
+        {
+            file_put_contents($targetPath, $this->fakeZipContent);
+        }
+
+        protected function runInstall(IOInterface $io): void
+        {
+            $this->downloadNativeSass($io);
+        }
+    };
+
+    $plugin->onScriptEvent($event);
+
+    expect(file_get_contents($targetDir . '/.sass-version'))->toBe('1.99.0')
+        ->and(file_exists($targetDir . '/sass.bat'))->toBeFalse();
+
+    // cleanup
+    $cleanup = function ($path) use (&$cleanup) {
+        if (is_file($path)) {
+            unlink($path);
+
+            return;
+        }
+
+        if (! is_dir($path)) {
+            return;
+        }
+
+        $entries = scandir($path);
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            $cleanup($path . '/' . $entry);
+        }
+
+        rmdir($path);
+    };
+
+    $cleanup($targetDir);
+    @rmdir($baseDir);
+
+    Mockery::close();
 });

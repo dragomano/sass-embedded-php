@@ -53,6 +53,8 @@ it('installs Sass when bin directory does not exist', function () {
         } else {
             expect(is_file($binDir . '/sass'))->toBeTrue();
         }
+
+        expect(is_file($binDir . '/.sass-version'))->toBeTrue();
     } finally {
         if (is_dir($binDir)) {
             $cleanup = function ($path) use (&$cleanup) {

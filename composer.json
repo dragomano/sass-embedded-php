@@ -19,16 +19,16 @@
   "require": {
     "php": "^8.2",
     "composer-plugin-api": "^2.0",
-    "symfony/process": "^7.4|^8.0",
+    "symfony/process": "^7.4|^8.1",
     "ext-zip": "*"
   },
   "require-dev": {
     "bugo/scss-benchmark-utils": "dev-main",
     "composer/composer": "*",
-    "friendsofphp/php-cs-fixer": "^3.94",
-    "mockery/mockery": "dev-bugfix/spy-generics",
-    "pestphp/pest": "^3.8|^4.4",
-    "rector/rector": "^2.3",
+    "friendsofphp/php-cs-fixer": "^3.95",
+    "mockery/mockery": "^1.6.15",
+    "pestphp/pest": "^3.8|^4.7|^5.1",
+    "rector/rector": "^2.6",
     "scssphp/scssphp": "^2.1"
   },
   "autoload": {

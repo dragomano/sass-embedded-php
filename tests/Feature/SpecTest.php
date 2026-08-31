@@ -23,7 +23,7 @@ if (getenv('RUN_SASS_SPEC') && is_dir($specDir)) {
                     continue;
                 }
 
-                it($relative, function () use ($compiler, $testCases) {
+                it('checks ' . $relative, function () use ($compiler, $testCases) {
                     $failures = [];
 
                     foreach ($testCases as [$testName, $inputRelPath, $inputSource, $expectedCss, $supportFiles]) {

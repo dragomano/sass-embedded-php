@@ -65,13 +65,11 @@ it('stores all options via constructor', function () {
     $options = new Options(
         syntax: 'scss',
         style: 'compressed',
-        optimizeCss: false,
         includeSources: false,
         loadPaths: ['/vendor/sass'],
         quietDeps: true,
         silenceDeprecations: ['import'],
         verbose: false,
-        removeEmptyLines: true,
         sourceMapPath: '/out/style.map',
         url: 'file:///src/style.scss',
         sourceFile: 'style.scss',
@@ -79,13 +77,11 @@ it('stores all options via constructor', function () {
 
     expect($options->syntax)->toBe('scss')
         ->and($options->style)->toBe('compressed')
-        ->and($options->optimizeCss)->toBeFalse()
         ->and($options->includeSources)->toBeFalse()
         ->and($options->loadPaths)->toBe(['/vendor/sass'])
         ->and($options->quietDeps)->toBeTrue()
         ->and($options->silenceDeprecations)->toBe(['import'])
         ->and($options->verbose)->toBeFalse()
-        ->and($options->removeEmptyLines)->toBeTrue()
         ->and($options->sourceMapPath)->toBe('/out/style.map')
         ->and($options->url)->toBe('file:///src/style.scss')
         ->and($options->sourceFile)->toBe('style.scss');

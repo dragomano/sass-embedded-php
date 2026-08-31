@@ -143,9 +143,9 @@ function makePluginForFetchUrl(?Composer $composer, ?IOInterface $io): Plugin
 
 beforeEach(function () {
     $this->plugin   = new Plugin();
-    $this->composer = Mockery::mock(Composer::class);
-    $this->io       = Mockery::mock(IOInterface::class);
-    $this->config   = Mockery::mock(Config::class);
+    $this->composer = mock(Composer::class);
+    $this->io       = mock(IOInterface::class);
+    $this->config   = mock(Config::class);
 });
 
 afterEach(function () {
@@ -200,15 +200,19 @@ it('uninstall does nothing', function () {
 });
 
 it('onPackageEvent triggers installation when sass not installed', function () {
-    $packageEvent = Mockery::mock(PackageEvent::class);
+    $packageEvent = mock(PackageEvent::class);
 
     $this->config->shouldReceive('get')
         ->with('bin-dir')
         ->once()
         ->andReturn('vendor/bin');
 
+    $this->config->shouldReceive('get')
+        ->with('github-oauth')
+        ->zeroOrMoreTimes()
+        ->andReturn([]);
+
     $this->composer->shouldReceive('getConfig')
-        ->once()
         ->andReturn($this->config);
 
     $packageEvent->shouldReceive('getComposer')
@@ -221,14 +225,134 @@ it('onPackageEvent triggers installation when sass not installed', function () {
 
     $this->io->shouldReceive('write')->zeroOrMoreTimes();
 
-    $this->plugin->activate($this->composer, $this->io);
-    $this->plugin->onPackageEvent($packageEvent);
+    $tmpDir = sys_get_temp_dir() . '/sass-unit-test-' . uniqid();
+    mkdir($tmpDir, 0777, true);
+
+    $plugin = new class ($tmpDir) extends Plugin {
+        public function __construct(private readonly string $fakeBaseDir) {}
+
+        protected function getPackagePath(): string
+        {
+            return $this->fakeBaseDir;
+        }
+
+        protected function getLatestVersion(): string
+        {
+            return '1.0.0';
+        }
+
+        protected function isNativeSassInstalled(string $targetDir): bool
+        {
+            return false;
+        }
+
+        protected function downloadNativeSass(IOInterface $io): void
+        {
+            $io->write('called');
+        }
+    };
+
+    $plugin->activate($this->composer, $this->io);
+    $plugin->onPackageEvent($packageEvent);
 
     expect(true)->toBeTrue();
+
+    rmdir($tmpDir);
+});
+
+it('getOsFamily returns the real PHP_OS_FAMILY constant', function () {
+    $plugin = new class () extends Plugin {
+        public function exposeGetOsFamily(): string
+        {
+            return $this->getOsFamily();
+        }
+    };
+
+    expect($plugin->exposeGetOsFamily())->toBe(PHP_OS_FAMILY);
+});
+
+it('getMachine returns the real php_uname value', function () {
+    $plugin = new class () extends Plugin {
+        public function exposeGetMachine(): string
+        {
+            return $this->getMachine();
+        }
+    };
+
+    expect($plugin->exposeGetMachine())->toBe(php_uname('m'));
+});
+
+it('getPackagePath returns realpath set during activate', function () {
+    $this->config->shouldReceive('get')
+        ->with('bin-dir')
+        ->andReturn('vendor/bin');
+
+    $this->composer->shouldReceive('getConfig')
+        ->andReturn($this->config);
+
+    $plugin = new class () extends Plugin {
+        public function exposeGetPackagePath(): string
+        {
+            return $this->getPackagePath();
+        }
+    };
+
+    $plugin->activate($this->composer, $this->io);
+
+    expect($plugin->exposeGetPackagePath())->toBe((string) realpath(__DIR__ . '/../../'));
+});
+
+it('doFileGetContents reads content via the real file_get_contents call', function () {
+    $tmpFile = sys_get_temp_dir() . '/plugin-do-file-get-contents-' . uniqid() . '.txt';
+    file_put_contents($tmpFile, 'hello-from-real-implementation');
+
+    $plugin = new class () extends Plugin {
+        public function exposeDoFileGetContents(string $url, mixed $context): string|false
+        {
+            return $this->doFileGetContents($url, $context);
+        }
+    };
+
+    $context = stream_context_create();
+
+    expect($plugin->exposeDoFileGetContents($tmpFile, $context))
+        ->toBe('hello-from-real-implementation');
+
+    unlink($tmpFile);
+});
+
+it('fetchFileContent builds a stream context with SSL verification options', function () {
+    $tmpFile = sys_get_temp_dir() . '/plugin-fetch-file-content-' . uniqid() . '.txt';
+    file_put_contents($tmpFile, 'archive-bytes');
+
+    $plugin = new class () extends Plugin {
+        public array $capturedContextOptions = [];
+
+        protected function doFileGetContents(string $url, mixed $context): string|false
+        {
+            $this->capturedContextOptions = stream_context_get_options($context);
+
+            return file_get_contents($url);
+        }
+
+        public function exposeFetchFileContent(string $url): string|false
+        {
+            return $this->fetchFileContent($url);
+        }
+    };
+
+    $result = $plugin->exposeFetchFileContent($tmpFile);
+
+    expect($result)->toBe('archive-bytes')
+        ->and($plugin->capturedContextOptions['http']['header'])->toContain('User-Agent: sass-embedded-php')
+        ->and($plugin->capturedContextOptions['ssl']['verify_peer'])->toBeTrue()
+        ->and($plugin->capturedContextOptions['ssl']['verify_peer_name'])->toBeTrue();
+
+    unlink($tmpFile);
 });
 
 it('onScriptEvent calls getComposer and getIO', function () {
-    $scriptEvent = Mockery::mock(Event::class);
+    $scriptEvent = mock(Event::class);
 
     $this->config->shouldReceive('get')
         ->with('bin-dir')
@@ -252,7 +376,7 @@ it('onScriptEvent calls getComposer and getIO', function () {
 });
 
 it('installBinary static method calls getComposer and getIO', function () {
-    $scriptEvent = Mockery::mock(Event::class);
+    $scriptEvent = mock(Event::class);
 
     $this->config->shouldReceive('get')
         ->with('bin-dir')
@@ -275,8 +399,8 @@ it('installBinary static method calls getComposer and getIO', function () {
 });
 
 it('runInstall executes only once', function () {
-    $scriptEvent1 = Mockery::mock(Event::class);
-    $scriptEvent2 = Mockery::mock(Event::class);
+    $scriptEvent1 = mock(Event::class);
+    $scriptEvent2 = mock(Event::class);
 
     $this->config->shouldReceive('get')
         ->with('bin-dir')
@@ -309,7 +433,7 @@ it('runInstall executes only once', function () {
 });
 
 it('onPackageEvent calls getComposer and getIO', function () {
-    $packageEvent = Mockery::mock(PackageEvent::class);
+    $packageEvent = mock(PackageEvent::class);
 
     $this->config->shouldReceive('get')
         ->with('bin-dir')
@@ -474,10 +598,10 @@ it('extractArchive on Windows extracts zip successfully', function () {
 });
 
 it('downloadNativeSass writes already installed message when sass is present', function () {
-    $io       = Mockery::mock(IOInterface::class);
-    $composer = Mockery::mock(Composer::class);
-    $config   = Mockery::mock(Config::class);
-    $event    = Mockery::mock(Event::class);
+    $io       = mock(IOInterface::class);
+    $composer = mock(Composer::class);
+    $config   = mock(Config::class);
+    $event    = mock(Event::class);
 
     $config->shouldReceive('get')->with('bin-dir')->andReturn('vendor/bin');
     $composer->shouldReceive('getConfig')->andReturn($config);
@@ -539,10 +663,10 @@ it('downloadNativeSass on Windows extracts zip and flattens dart-sass directory'
 
     unlink($zipPath);
 
-    $io       = Mockery::mock(IOInterface::class);
-    $composer = Mockery::mock(Composer::class);
-    $config   = Mockery::mock(Config::class);
-    $event    = Mockery::mock(Event::class);
+    $io       = mock(IOInterface::class);
+    $composer = mock(Composer::class);
+    $config   = mock(Config::class);
+    $event    = mock(Event::class);
 
     $config->shouldReceive('get')->with('bin-dir')->andReturn('vendor/bin');
 
@@ -722,7 +846,7 @@ it('extractArchive on Unix runs tar and succeeds', function () {
 
     mkdir($targetDir, 0777, true);
 
-    $process = Mockery::mock(Process::class);
+    $process = mock(Process::class);
     $process->shouldReceive('run')->once();
     $process->shouldReceive('isSuccessful')->once()->andReturn(true);
 
@@ -754,7 +878,7 @@ it('extractArchive on Unix runs tar and succeeds', function () {
 });
 
 it('extractArchive on Unix throws when tar fails', function () {
-    $process = Mockery::mock(Process::class);
+    $process = mock(Process::class);
     $process->shouldReceive('run')->once();
     $process->shouldReceive('isSuccessful')->once()->andReturn(false);
     $process->shouldReceive('getErrorOutput')->once()->andReturn('tar: file not found');
@@ -879,9 +1003,9 @@ it('isNativeSassInstalled returns false on Unix when files are missing', functio
 });
 
 it('fetchUrl adds Authorization header when composer provides github-oauth token', function () {
-    $config   = Mockery::mock(Config::class);
-    $composer = Mockery::mock(Composer::class);
-    $io       = Mockery::mock(IOInterface::class);
+    $config   = mock(Config::class);
+    $composer = mock(Composer::class);
+    $io       = mock(IOInterface::class);
 
     $config->shouldReceive('get')->with('bin-dir')->andReturn('vendor/bin');
     $config->shouldReceive('get')->with('github-oauth')->andReturn(['github.com' => 'my-secret-token']);
@@ -1024,10 +1148,10 @@ it('downloadNativeSass removes old files and updates when version differs', func
     $zipContent = file_get_contents($zipPath);
     unlink($zipPath);
 
-    $io       = Mockery::mock(IOInterface::class);
-    $composer = Mockery::mock(Composer::class);
-    $config   = Mockery::mock(Config::class);
-    $event    = Mockery::mock(Event::class);
+    $io       = mock(IOInterface::class);
+    $composer = mock(Composer::class);
+    $config   = mock(Config::class);
+    $event    = mock(Event::class);
 
     $config->shouldReceive('get')->with('bin-dir')->andReturn('vendor/bin');
     $composer->shouldReceive('getConfig')->andReturn($config);

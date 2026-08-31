@@ -96,7 +96,7 @@ if (is_dir($specDir)) {
     removeDirectory($specDir);
 }
 
-copyDirectory($extractedSpec, $specDir, ['libsass', 'libsass-*']);
+copyDirectory($extractedSpec, $specDir);
 removeDirectory($tempDir);
 
 echo "Done. spec/ updated to {$ref}\n";

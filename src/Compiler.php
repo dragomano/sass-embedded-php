@@ -8,7 +8,6 @@ use Symfony\Component\Process\Process;
 
 use function array_filter;
 use function array_merge;
-use function base64_encode;
 use function dirname;
 use function file_exists;
 use function file_put_contents;
@@ -16,12 +15,21 @@ use function filemtime;
 use function is_array;
 use function json_decode;
 use function json_encode;
-use function preg_replace_callback;
+use function preg_match;
+use function preg_replace;
+use function rawurldecode;
 use function trim;
-use function urldecode;
 
 class Compiler implements CompilerInterface
 {
+    use HandlesSourceMaps;
+
+    /**
+     * The `sourceMappingURL` comment that `--embed-source-map` appends. Dart
+     * Sass percent-encodes the JSON rather than base64-encoding it.
+     */
+    private const EMBEDDED_SOURCE_MAP = '~\s*/\*# sourceMappingURL=data:application/json;charset=utf-8,(\S+) \*/~';
+
     public function __construct(protected Options $options = new Options()) {}
 
     public function setOptions(Options $options): static
@@ -93,7 +101,7 @@ class Compiler implements CompilerInterface
 
         $css = $out ?: $err;
 
-        return $this->rewriteSourceMap($css, $options);
+        return $this->applySourceMap($css, $options, $filePath);
     }
 
     protected function resolveOptions(?Options $options = null): array
@@ -120,25 +128,42 @@ class Compiler implements CompilerInterface
             throw new Exception('Sass process failed: ' . ($err ?: 'unknown error'));
         }
 
-        return $this->rewriteSourceMap($out, $options);
+        return $this->applySourceMap($out, $options, $options['sourceFile'] ?? $options['url'] ?? '');
     }
 
-    protected function rewriteSourceMap(string $css, array $options): string
+    /**
+     * Re-emits the map that `--embed-source-map` returned inside the CSS.
+     *
+     * Writing to stdout is the only mode this bridge uses, and there the CLI can
+     * hand a map back solely by embedding it. So the data URI is unpacked here
+     * and the map is then placed wherever `sourceMapPath` asks for.
+     */
+    protected function applySourceMap(string $css, array $options, string $name): string
     {
-        return preg_replace_callback(
-            '#sourceMappingURL=data:application/json;charset=utf-8,([^ ]+)#',
-            static function (array $matches) use ($options): string {
-                $sourceMap = json_decode(urldecode($matches[1]), true);
+        $this->sourceMap = null;
 
-                if (is_array($sourceMap) && isset($options['url'])) {
-                    $sourceMap['sourceRoot'] = '';
-                    $sourceMap['sources']    = [$options['url']];
-                }
+        if (! self::wantsSourceMap($options['sourceMapPath'] ?? null)) {
+            return $css;
+        }
 
-                return 'sourceMappingURL=data:application/json;base64,' . base64_encode((string) json_encode($sourceMap));
-            },
-            $css
-        ) ?? $css;
+        if (preg_match(self::EMBEDDED_SOURCE_MAP, $css, $matches) !== 1) {
+            return $css;
+        }
+
+        $sourceMap = json_decode(rawurldecode($matches[1]), true);
+
+        if (is_array($sourceMap) && isset($options['url'])) {
+            $sourceMap['sourceRoot'] = '';
+            $sourceMap['sources']    = [$options['url']];
+        }
+
+        return $this->emitSourceMap(
+            (string) preg_replace(self::EMBEDDED_SOURCE_MAP, '', $css),
+            (string) json_encode($sourceMap),
+            $options['sourceMapPath'],
+            ($options['style'] ?? null) === 'compressed',
+            $name,
+        );
     }
 
     protected function buildSassArgs(array $opts): array
@@ -153,7 +178,7 @@ class Compiler implements CompilerInterface
             $args[] = '--style=' . $opts['style'];
         }
 
-        if (($opts['sourceMapPath'] ?? null) === 'inline') {
+        if (self::wantsSourceMap($opts['sourceMapPath'] ?? null)) {
             $args[] = '--embed-source-map';
 
             if ($opts['includeSources'] ?? false) {

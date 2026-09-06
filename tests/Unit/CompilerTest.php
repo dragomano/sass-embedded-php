@@ -218,6 +218,79 @@ it('compileFile includes inline source map when requested', function () {
     unlink($input);
 });
 
+it('emits source maps in every supported sourceMapPath mode', function () {
+    $dir   = sys_get_temp_dir() . '/sass-cli-map-' . bin2hex(random_bytes(6));
+    $input = $dir . '/app.scss';
+
+    mkdir($dir);
+    file_put_contents($input, '.box { color: red; }');
+    file_put_contents($dir . '/vars.scss', '$color: red;');
+
+    try {
+        expect($this->compiler->compileFile($input))->not->toContain('sourceMappingURL')
+            ->and($this->compiler->getSourceMap())->toBeNull();
+
+        // A stylesheet that emits no CSS still carries a map, as the CLI itself does.
+        expect($this->compiler->compileFile($dir . '/vars.scss', new Options(sourceMapPath: 'inline')))
+            ->toStartWith("\n\n/*# sourceMappingURL=data:application/json;base64,");
+
+        $explicit = $this->compiler->compileFile($input, new Options(sourceMapPath: $dir . '/custom.map'));
+
+        expect($explicit)->toEndWith("\n\n/*# sourceMappingURL=custom.map */")
+            ->and(json_decode((string) file_get_contents($dir . '/custom.map'), true))->toHaveKey('mappings');
+
+        $intoDir = $this->compiler->compileFile($input, new Options(sourceMapPath: $dir));
+
+        expect($intoDir)->toEndWith("\n\n/*# sourceMappingURL=app.css.map */")
+            ->and(is_file($dir . '/app.css.map'))->toBeTrue();
+
+        $remote = $this->compiler->compileString('.box { color: red; }', new Options(
+            style: 'compressed',
+            sourceMapPath: 'https://cdn.example.test/app.css.map',
+        ));
+
+        expect($remote)->toBe(".box{color:red}\n/*# sourceMappingURL=https://cdn.example.test/app.css.map */")
+            ->and($this->compiler->getSourceMap())->not->toBeNull();
+
+        $inline = $this->compiler->compileString('.box { color: red; }', new Options(
+            includeSources: true,
+            sourceMapPath: 'inline',
+            url: 'file:///virtual/input.scss',
+        ));
+
+        $map = json_decode((string) $this->compiler->getSourceMap(), true);
+
+        expect($inline)->toContain('sourceMappingURL=data:application/json;base64,')
+            ->and($map['sources'])->toBe(['file:///virtual/input.scss'])
+            ->and($map)->toHaveKey('sourcesContent');
+
+        set_error_handler(static fn() => true);
+
+        expect(fn() => $this->compiler->compileFile($input, new Options(sourceMapPath: $dir . '/absent/app.css.map')))
+            ->toThrow(Exception::class, 'Unable to write the source map to');
+    } finally {
+        restore_error_handler();
+
+        foreach ((array) glob($dir . '/*') as $entry) {
+            unlink((string) $entry);
+        }
+
+        rmdir($dir);
+    }
+});
+
+it('leaves css untouched when the cli embedded no source map', function () {
+    $compiler = new class () extends Compiler {
+        public function exposeApplySourceMap(string $css, array $options): string
+        {
+            return $this->applySourceMap($css, $options, 'app.scss');
+        }
+    };
+
+    expect($compiler->exposeApplySourceMap('a{b:c}', ['sourceMapPath' => 'inline']))->toBe('a{b:c}')
+        ->and($compiler->getSourceMap())->toBeNull();
+});
+
 it('compileFile uses loadPaths option', function () {
     $input = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
     $loadPath = sys_get_temp_dir();

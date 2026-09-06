@@ -9,6 +9,8 @@ use ValueError;
 
 final class EmbeddedCompiler implements CompilerInterface
 {
+    use HandlesSourceMaps;
+
     /**
      * Major version of the embedded protocol this codec speaks.
      *
@@ -81,13 +83,19 @@ final class EmbeddedCompiler implements CompilerInterface
         }
 
         $options ??= $this->options;
+
+        $url   = self::stringUrl($options);
         $input = self::field(1, $source);
+
+        if ($url !== '') {
+            $input .= self::field(2, $url);
+        }
 
         if ($options->syntax === 'indented') {
             $input .= self::scalar(3, 1);
         }
 
-        return $this->compile(self::field(2, $input), $options);
+        return $this->compile(self::field(2, $input), $options, $url);
     }
 
     public function compileFile(string $path, ?Options $options = null): string
@@ -96,7 +104,7 @@ final class EmbeddedCompiler implements CompilerInterface
             throw new Exception("File not found: $path");
         }
 
-        return $this->compile(self::field(3, $path), $options ?? $this->options);
+        return $this->compile(self::field(3, $path), $options ?? $this->options, $path);
     }
 
     public function compileFileAndSave(string $inputPath, string $outputPath, ?Options $options = null): bool
@@ -133,9 +141,10 @@ final class EmbeddedCompiler implements CompilerInterface
         $this->process = null;
     }
 
-    private function compile(string $input, Options $options): string
+    private function compile(string $input, Options $options, string $name): string
     {
-        $this->logs = [];
+        $this->logs      = [];
+        $this->sourceMap = null;
 
         try {
             $this->start();
@@ -176,7 +185,13 @@ final class EmbeddedCompiler implements CompilerInterface
                 if (isset($response[2][0])) {
                     $success = self::fields($response[2][0]);
 
-                    return $success[1][0] ?? '';
+                    return $this->emitSourceMap(
+                        $success[1][0] ?? '',
+                        $success[2][0] ?? '',
+                        $options->sourceMapPath,
+                        $options->style === 'compressed',
+                        $name,
+                    );
                 }
 
                 $failure = self::fields($response[3][0] ?? '');
@@ -211,12 +226,54 @@ final class EmbeddedCompiler implements CompilerInterface
         }
     }
 
+    /**
+     * Canonical URL for a string input, taken from `url` or, failing that, from
+     * the virtual `sourceFile` name. Dart Sass needs an absolute URL here, so a
+     * bare filename is resolved against the working directory.
+     */
+    private static function stringUrl(Options $options): string
+    {
+        $url = $options->url ?? $options->sourceFile ?? '';
+
+        if ($url === '') {
+            return '';
+        }
+
+        return self::hasUrlScheme($url) ? $url : self::fileUrl($url);
+    }
+
+    private static function fileUrl(string $path): string
+    {
+        $path = str_replace('\\', '/', $path);
+
+        if (preg_match('#^(?:[a-zA-Z]:/|/)#', $path) !== 1) {
+            $path = str_replace('\\', '/', (string) getcwd()) . '/' . $path;
+        }
+
+        $segments = explode('/', ltrim($path, '/'));
+        $drive    = '';
+
+        if (preg_match('/^[a-zA-Z]:$/', $segments[0]) === 1) {
+            $drive = array_shift($segments) . '/';
+        }
+
+        return 'file:///' . $drive . implode('/', array_map(rawurlencode(...), $segments));
+    }
+
     private function compileOptions(Options $options): string
     {
         $request = self::scalar(9, 1) . self::scalar(13, 1);
 
         if ($options->style === 'compressed') {
             $request .= self::scalar(4, 1);
+        }
+
+        if (self::wantsSourceMap($options->sourceMapPath)) {
+            $request .= self::scalar(5, 1);
+
+            if ($options->includeSources) {
+                $request .= self::scalar(12, 1);
+            }
         }
 
         foreach ($options->loadPaths ?? [] as $path) {

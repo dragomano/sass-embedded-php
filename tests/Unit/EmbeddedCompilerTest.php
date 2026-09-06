@@ -16,7 +16,10 @@ namespace Bugo\Sass {
 namespace {
     use Bugo\Sass\EmbeddedCompiler;
     use Bugo\Sass\Exception;
+    use Bugo\Sass\LogEvent;
+    use Bugo\Sass\LogType;
     use Bugo\Sass\Options;
+    use Bugo\Sass\ProtocolException;
 
     it('compiles multiple stylesheets in one embedded process', function () {
         $compiler = new EmbeddedCompiler();
@@ -75,11 +78,17 @@ namespace {
         }
     });
 
-    it('returns Sass compilation errors and can be closed repeatedly', function () {
+    it('reports Sass compilation errors without killing the process', function () {
         $compiler = new EmbeddedCompiler();
+        $process  = new ReflectionProperty(EmbeddedCompiler::class, 'process');
 
         try {
-            expect(fn() => $compiler->compileString('a {'))->toThrow(Exception::class, 'Error:');
+            $compiler->compileString('a { b: c }');
+            $started = $process->getValue($compiler);
+
+            expect(fn() => $compiler->compileString('a {'))->toThrow(Exception::class, 'Error:')
+                ->and($process->getValue($compiler))->toBe($started)
+                ->and($compiler->compileString('a { b: c }'))->toBe("a {\n  b: c;\n}");
         } finally {
             $compiler->close();
             $compiler->close();
@@ -91,7 +100,7 @@ namespace {
 
         try {
             expect(fn() => (new EmbeddedCompiler())->compileString('a { b: c }'))
-                ->toThrow(RuntimeException::class, 'Unable to start the Dart Sass embedded compiler.');
+                ->toThrow(ProtocolException::class, 'Unable to start the Dart Sass embedded compiler.');
         } finally {
             unset($GLOBALS['force_proc_open_failure']);
         }
@@ -106,7 +115,7 @@ namespace {
                 3 => [str_repeat('b', 4)],
                 4 => ['foo'],
             ])
-            ->and(fn() => invokeEmbedded('fields', "\x0b"))->toThrow(RuntimeException::class, 'Unsupported Dart Sass embedded protocol field type 3');
+            ->and(fn() => invokeEmbedded('fields', "\x0b"))->toThrow(ProtocolException::class, 'Unsupported Dart Sass embedded protocol field type 3');
     });
 
     it('encodes every supported compile option', function () {
@@ -120,7 +129,10 @@ namespace {
 
         $encoded = invokeEmbeddedOn(new EmbeddedCompiler(), 'compileOptions', $options);
 
-        expect($encoded)->toContain("\x48\x01", "\x68\x01", "\x70\x01", "\x20\x01", "\x32\x05\x0a\x03one", "\x32\x05\x0a\x03two", "\x82\x01\x06import");
+        expect($encoded)->toContain("\x48\x01", "\x68\x01", "\x50\x01", "\x58\x01", "\x20\x01", "\x32\x05\x0a\x03one", "\x32\x05\x0a\x03two", "\x82\x01\x06import");
+
+        // The `silent` field would suppress every LogEvent, including @warn and @debug.
+        expect($encoded)->not->toContain("\x70\x01");
     });
 
     it('builds embedded commands for supported platforms', function () {
@@ -136,35 +148,92 @@ namespace {
 
     it('handles embedded protocol errors and events', function () {
         withEmbeddedOutput("\x09\x01\x0a\x06\x1a\x04oops", function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))->toThrow(RuntimeException::class, 'oops');
+            expect(fn() => $compiler->compileString('a {}'))->toThrow(ProtocolException::class, 'oops');
         });
 
         withEmbeddedOutput("\x03\x01\x1a\x00\x08\x01\x12\x05\x12\x03\x0a\x01x", function (EmbeddedCompiler $compiler): void {
+            expect($compiler->compileString('a {}'))->toBe('x')
+                ->and($compiler->getLogs())->toHaveCount(1)
+                ->and($compiler->getLogs()[0]->type)->toBe(LogType::Warning);
+        });
+    });
+
+    it('verifies the compiler protocol version on startup', function () {
+        // OutboundMessage.version_response { protocol_version: "3.2.0" }
+        withEmbeddedOutput("\x0a\x00\x42\x07\x0a\x05" . '3.2.0', function (EmbeddedCompiler $compiler): void {
+            expect(invokeEmbeddedOn($compiler, 'handshake'))->toBeNull();
+        });
+
+        withEmbeddedOutput("\x0a\x00\x42\x07\x0a\x05" . '2.0.0', function (EmbeddedCompiler $compiler): void {
+            expect(fn() => invokeEmbeddedOn($compiler, 'handshake'))
+                ->toThrow(ProtocolException::class, 'Unsupported Sass embedded protocol version 2.0.0');
+        });
+
+        // A compile_response instead of a version_response.
+        withEmbeddedOutput("\x03\x00\x12\x00", function (EmbeddedCompiler $compiler): void {
+            expect(fn() => invokeEmbeddedOn($compiler, 'handshake'))
+                ->toThrow(ProtocolException::class, 'did not respond to the version request');
+        });
+
+        withEmbeddedOutput("\x03\x00\x42\x00", function (EmbeddedCompiler $compiler): void {
+            expect(fn() => invokeEmbeddedOn($compiler, 'handshake'))
+                ->toThrow(ProtocolException::class, 'did not report its protocol version');
+        });
+
+        withEmbeddedOutput("\x09\x00\x0a\x06\x1a\x04oops", function (EmbeddedCompiler $compiler): void {
+            expect(fn() => invokeEmbeddedOn($compiler, 'handshake'))->toThrow(ProtocolException::class, 'oops');
+        });
+    });
+
+    it('collects log events emitted during compilation', function () {
+        $debug = "\x21\x01\x1a\x1e\x10\x02\x1a\x05hello\x2a\x05trace\x32\x04fmtd\x3a\x06import";
+        $alien = "\x09\x01\x1a\x06\x10\x07\x1a\x02hi";
+        $done  = "\x08\x01\x12\x05\x12\x03\x0a\x01x";
+
+        withEmbeddedOutput($debug . $alien . $done, function (EmbeddedCompiler $compiler): void {
+            $seen = [];
+
+            $compiler->setLogHandler(static function (LogEvent $event) use (&$seen): void {
+                $seen[] = $event->message;
+            });
+
             expect($compiler->compileString('a {}'))->toBe('x');
+
+            [$first, $second] = $compiler->getLogs();
+
+            expect($seen)->toBe(['hello', 'hi'])
+                ->and($first->type)->toBe(LogType::Debug)
+                ->and($first->message)->toBe('hello')
+                ->and($first->formatted)->toBe('fmtd')
+                ->and($first->deprecationType)->toBe('import')
+                ->and($first->stackTrace)->toBe('trace')
+                // An unknown LogEventType degrades to a plain warning.
+                ->and($second->type)->toBe(LogType::Warning)
+                ->and($second->deprecationType)->toBeNull();
         });
     });
 
     it('rejects unsupported and mismatched embedded messages', function () {
         withEmbeddedOutput("\x03\x01\x22\x00", function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))->toThrow(RuntimeException::class, 'unsupported message');
+            expect(fn() => $compiler->compileString('a {}'))->toThrow(ProtocolException::class, 'unsupported message');
         });
 
         withEmbeddedOutput("\x08\x02\x12\x05\x12\x03\x0a\x01x", function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))->toThrow(RuntimeException::class, 'unexpected compilation');
+            expect(fn() => $compiler->compileString('a {}'))->toThrow(ProtocolException::class, 'unexpected compilation');
         });
     });
 
     it('reports stopped and timed out embedded processes with stderr', function () {
         withEmbeddedOutput('', function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))->toThrow(RuntimeException::class, 'stopped unexpectedly');
+            expect(fn() => $compiler->compileString('a {}'))->toThrow(ProtocolException::class, 'stopped unexpectedly');
         });
 
         withEmbeddedOutput("\x02", function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))->toThrow(RuntimeException::class, 'stopped unexpectedly');
+            expect(fn() => $compiler->compileString('a {}'))->toThrow(ProtocolException::class, 'stopped unexpectedly');
         });
 
         withEmbeddedOutput('', function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))->toThrow(RuntimeException::class, 'stderr: diagnostic');
+            expect(fn() => $compiler->compileString('a {}'))->toThrow(ProtocolException::class, 'stderr: diagnostic');
         }, timeout: 0.01, wait: true, stderr: 'diagnostic');
     });
 
@@ -175,7 +244,7 @@ namespace {
 
         try {
             expect(fn() => invokeEmbeddedOn($compiler, 'waitForStream', $stderr, microtime(true) - 1))
-                ->toThrow(RuntimeException::class, 'timed out');
+                ->toThrow(ProtocolException::class, 'timed out');
         } finally {
             fclose($stderr);
         }
@@ -189,7 +258,7 @@ namespace {
         try {
             set_error_handler(static fn() => true);
             expect(fn() => invokeEmbeddedOn($compiler, 'write', 'data', microtime(true) + 1))
-                ->toThrow(RuntimeException::class, 'Unable to write');
+                ->toThrow(ProtocolException::class, 'Unable to write');
         } finally {
             restore_error_handler();
             fclose($read);
@@ -204,7 +273,7 @@ namespace {
         try {
             set_error_handler(static fn() => true);
             expect(fn() => invokeEmbeddedOn($compiler, 'waitForStream', $stream, microtime(true) + 1))
-                ->toThrow(RuntimeException::class, 'Unable to communicate');
+                ->toThrow(ProtocolException::class, 'Unable to communicate');
         } finally {
             restore_error_handler();
             fclose($stream);

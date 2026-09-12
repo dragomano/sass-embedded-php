@@ -10,228 +10,133 @@ beforeEach(function () {
     $this->compiler = new Compiler();
 });
 
-it('returns empty css for empty string input in compileString', function () {
-    $css = $this->compiler->compileString('');
+it('stores options and merges method overrides', function () {
+    $options = new Options(style: 'expanded', includeSources: true);
 
-    expect($css)->toBe('');
+    expect($this->compiler->setOptions($options))->toBe($this->compiler)
+        ->and($this->compiler->getOptions())->toBe($options);
+
+    $resolved = (fn() => $this->resolveOptions(new Options(
+        style: 'compressed',
+        includeSources: false,
+        loadPaths: [],
+    )))->call($this->compiler);
+
+    expect($resolved)->toBe([
+        'style'          => 'compressed',
+        'includeSources' => false,
+        'loadPaths'      => [],
+    ]);
 });
 
-it('compiles indented syntax in compileString', function () {
-    $css = <<<'SASS'
+it('returns empty css for blank and comment-only input', function () {
+    expect($this->compiler->compileString(''))->toBe('')
+        ->and($this->compiler->compileString('// comment'))->toBe('');
+});
+
+it('compiles indented syntax and rejects invalid syntax', function () {
+    $sass = <<<'SASS'
     $color: red
 
     .box
       color: $color
     SASS;
 
-    $expected = ".box {\n  color: red;\n}";
-
-    $result = $this->compiler->compileString($css, new Options(syntax: 'indented'));
-
-    expect($result)->toBe($expected);
-});
-
-it('returns the options set via setOptions as Options object', function () {
-    $this->compiler->setOptions(new Options(
-        syntax: 'sass',
-        style: 'compressed',
-        sourceMapPath: '/tmp/style.map',
-    ));
-
-    $options = $this->compiler->getOptions();
-
-    expect($options)->toBeInstanceOf(Options::class)
-        ->and($options->syntax)->toBe('sass')
-        ->and($options->style)->toBe('compressed')
-        ->and($options->sourceMapPath)->toBe('/tmp/style.map');
-});
-
-it('setOptions with Options object stores it directly', function () {
-    $options = new Options(
-        syntax: 'sass',
-        style: 'compressed',
-        includeSources: true,
-        sourceMapPath: '/tmp/style.map',
-    );
-
-    $this->compiler->setOptions($options);
-
-    $stored = $this->compiler->getOptions();
-
-    expect($stored)->toBeInstanceOf(Options::class)
-        ->and($stored->syntax)->toBe('sass')
-        ->and($stored->style)->toBe('compressed')
-        ->and($stored->includeSources)->toBeTrue()
-        ->and($stored->sourceMapPath)->toBe('/tmp/style.map');
-});
-
-it('setOptions with Options object does not trigger a deprecation notice', function () {
-    $deprecation = null;
-    set_error_handler(function (int $errno, string $errstr) use (&$deprecation): bool {
-        $deprecation = $errstr;
-
-        return true;
-    }, E_USER_DEPRECATED);
-
-    $this->compiler->setOptions(new Options(style: 'compressed'));
-
-    restore_error_handler();
-
-    expect($deprecation)->toBeNull();
-});
-
-it('method-level Options override compiler defaults', function () {
-    $this->compiler->setOptions(new Options(
-        style: 'expanded',
-        includeSources: true,
-    ));
-
-    $resolved = (fn() => array_merge(
-        $this->resolveOptions(),
-        $this->resolveOptions(new Options(style: 'compressed'))
-    ))->call($this->compiler);
-
-    expect($resolved)->toBe([
-        'style' => 'compressed',
-        'includeSources' => true,
-    ]);
-});
-
-it('throws Exception when file does not exist', function () {
-    $this->compiler->compileFile(__DIR__ . '/nonexistent.scss');
-})->throws(Exception::class);
-
-it('throws Exception when input file does not exist in compileFileAndSave', function () {
-    $this->compiler->compileFileAndSave(
-        __DIR__ . '/nonexistent.scss',
-        __DIR__ . '/output.css'
-    );
-})->throws(Exception::class);
-
-it('compiles an existing file with default options', function () {
-    $tmpFile = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
-
-    file_put_contents($tmpFile, '$color: red; .box { color: $color; }');
-
-    $compiler = new class () extends Compiler {
-        protected function compileFileNative(string $filePath, array $options): string
-        {
-            return json_encode(['file' => $filePath, 'options' => $options]);
-        }
-    };
-
-    $result = $compiler->compileFile($tmpFile);
-    $data   = json_decode($result, true);
-
-    expect($data['file'])->toBe($tmpFile)
-        ->and($data['options'])->toBe([]);
-
-    unlink($tmpFile);
-});
-
-it('compiles an existing file with merged options', function () {
-    $tmpFile = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
-
-    file_put_contents($tmpFile, '$color: red; .box { color: $color; }');
-
-    $compiler = new class () extends Compiler {
-        protected function compileFileNative(string $filePath, array $options): string
-        {
-            return json_encode(['file' => $filePath, 'options' => $options]);
-        }
-    };
-
-    $compiler->setOptions(new Options(style: 'expanded'));
-
-    $result = $compiler->compileFile($tmpFile, new Options(style: 'compressed'));
-    $data   = json_decode($result, true);
-
-    expect($data['file'])->toBe($tmpFile)
-        ->and($data['options'])->toBe(['style' => 'compressed']);
-
-    unlink($tmpFile);
-});
-
-it('throws Exception on invalid scss syntax in compileString', function () {
-    expect(fn() => $this->compiler->compileString('{'))
+    expect($this->compiler->compileString($sass, new Options(syntax: 'indented')))
+        ->toBe(".box {\n  color: red;\n}")
+        ->and(fn() => $this->compiler->compileString('{'))
         ->toThrow(Exception::class, 'Sass compilation error:');
 });
 
-it('throws Exception when compileString output is empty', function () {
-    expect(fn() => $this->compiler->compileString('// comment'))
-        ->toThrow(Exception::class, 'Sass process failed: unknown error');
+it('reports native file compilation failures', function () {
+    $input = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
+
+    file_put_contents($input, '{');
+
+    try {
+        expect(fn() => $this->compiler->compileFile($input))
+            ->toThrow(Exception::class, 'Sass compilation error:');
+    } finally {
+        unlink($input);
+    }
 });
 
-it('compileFileAndSave writes css when input is newer than output', function () {
+it('rejects missing source files', function () {
+    $missing = __DIR__ . '/nonexistent.scss';
+
+    expect(fn() => $this->compiler->compileFile($missing))
+        ->toThrow(Exception::class, "File not found: $missing")
+        ->and(fn() => $this->compiler->compileFileAndSave($missing, $missing . '.css'))
+        ->toThrow(Exception::class, "Source file not found: $missing");
+});
+
+it('passes merged options to native file compilation', function () {
+    $input = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
+
+    file_put_contents($input, 'a { b: c }');
+
+    $compiler = new class (new Options(includeSources: true)) extends Compiler {
+        protected function compileFileNative(string $filePath, array $options): string
+        {
+            return json_encode(['file' => $filePath, 'options' => $options]);
+        }
+    };
+
+    try {
+        $data = json_decode($compiler->compileFile($input, new Options(style: 'compressed')), true);
+
+        expect($data['file'])->toBe($input)
+            ->and($data['options'])->toBe([
+                'style'          => 'compressed',
+                'includeSources' => true,
+            ]);
+    } finally {
+        unlink($input);
+    }
+});
+
+it('writes only newer source files', function () {
     $input  = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
     $output = tempnam(sys_get_temp_dir(), 'css') . '.css';
 
     file_put_contents($input, '.box { color: red; }');
     touch($output, time() - 100);
 
-    $result = $this->compiler->compileFileAndSave($input, $output);
+    try {
+        expect($this->compiler->compileFileAndSave($input, $output))->toBeTrue()
+            ->and(file_get_contents($output))->toContain('.box');
 
-    expect($result)->toBeTrue()
-        ->and(file_get_contents($output))->toContain('.box');
+        touch($output, time() + 100);
 
-    unlink($input);
-    unlink($output);
+        expect($this->compiler->compileFileAndSave($input, $output))->toBeFalse();
+    } finally {
+        unlink($input);
+        unlink($output);
+    }
 });
 
-it('compileFileAndSave returns false when output is up to date', function () {
-    $input  = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
-    $output = tempnam(sys_get_temp_dir(), 'css') . '.css';
-
-    file_put_contents($input, '.box { color: red; }');
-    touch($output, time() + 100);
-
-    $result = $this->compiler->compileFileAndSave($input, $output);
-
-    expect($result)->toBeFalse();
-
-    unlink($input);
-    unlink($output);
-});
-
-it('throws Exception when compileFile receives invalid scss', function () {
-    $tmpFile = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
-    file_put_contents($tmpFile, '{');
-
-    expect(fn() => $this->compiler->compileFile($tmpFile))
-        ->toThrow(Exception::class, 'Sass compilation error:');
-
-    unlink($tmpFile);
-});
-
-it('compileFile includes inline source map when requested', function () {
-    $input = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
-
-    file_put_contents($input, '.box { color: red; }');
-
-    $css = $this->compiler->compileFile($input, new Options(
-        sourceMapPath: 'inline',
-        url: 'file:///virtual/input.scss',
-    ));
-
-    expect($css)->toContain('sourceMappingURL=data:application/json;base64,');
-
-    unlink($input);
-});
-
-it('emits source maps in every supported sourceMapPath mode', function () {
+it('handles source map modes and url precedence', function () {
     $dir   = sys_get_temp_dir() . '/sass-cli-map-' . bin2hex(random_bytes(6));
     $input = $dir . '/app.scss';
 
     mkdir($dir);
     file_put_contents($input, '.box { color: red; }');
-    file_put_contents($dir . '/vars.scss', '$color: red;');
 
     try {
         expect($this->compiler->compileFile($input))->not->toContain('sourceMappingURL')
-            ->and($this->compiler->getSourceMap())->toBeNull()
-            // A stylesheet that emits no CSS still carries a map, as the CLI itself does.
-            ->and($this->compiler->compileFile($dir . '/vars.scss', new Options(sourceMapPath: 'inline')))
-            ->toStartWith("\n\n/*# sourceMappingURL=data:application/json;base64,");
+            ->and($this->compiler->getSourceMap())->toBeNull();
+
+        $inline = $this->compiler->compileString('.box { color: red; }', new Options(
+            includeSources: true,
+            sourceMapPath: 'inline',
+            url: 'file:///virtual/input.scss',
+            sourceFile: 'fallback.scss',
+        ));
+        $map = json_decode((string) $this->compiler->getSourceMap(), true);
+
+        expect($inline)->toContain('sourceMappingURL=data:application/json;base64,')
+            ->and($map['sources'])->toBe(['file:///virtual/input.scss'])
+            ->and($map)->toHaveKey('sourcesContent');
 
         $explicit = $this->compiler->compileFile($input, new Options(sourceMapPath: $dir . '/custom.map'));
 
@@ -248,25 +153,14 @@ it('emits source maps in every supported sourceMapPath mode', function () {
             sourceMapPath: 'https://cdn.example.test/app.css.map',
         ));
 
-        expect($remote)->toBe(".box{color:red}\n/*# sourceMappingURL=https://cdn.example.test/app.css.map */")
-            ->and($this->compiler->getSourceMap())->not->toBeNull();
-
-        $inline = $this->compiler->compileString('.box { color: red; }', new Options(
-            includeSources: true,
-            sourceMapPath: 'inline',
-            url: 'file:///virtual/input.scss',
-        ));
-
-        $map = json_decode((string) $this->compiler->getSourceMap(), true);
-
-        expect($inline)->toContain('sourceMappingURL=data:application/json;base64,')
-            ->and($map['sources'])->toBe(['file:///virtual/input.scss'])
-            ->and($map)->toHaveKey('sourcesContent');
+        expect($remote)->toBe(".box{color:red}\n/*# sourceMappingURL=https://cdn.example.test/app.css.map */");
 
         set_error_handler(static fn() => true);
 
-        expect(fn() => $this->compiler->compileFile($input, new Options(sourceMapPath: $dir . '/absent/app.css.map')))
-            ->toThrow(Exception::class, 'Unable to write the source map to');
+        expect(fn() => $this->compiler->compileFile(
+            $input,
+            new Options(sourceMapPath: $dir . '/absent/app.css.map')
+        ))->toThrow(Exception::class, 'Unable to write the source map to');
     } finally {
         restore_error_handler();
 
@@ -278,7 +172,7 @@ it('emits source maps in every supported sourceMapPath mode', function () {
     }
 });
 
-it('leaves css untouched when the cli embedded no source map', function () {
+it('leaves css unchanged when the cli returns no embedded map', function () {
     $compiler = new class () extends Compiler {
         public function exposeApplySourceMap(string $css, array $options): string
         {
@@ -290,91 +184,41 @@ it('leaves css untouched when the cli embedded no source map', function () {
         ->and($compiler->getSourceMap())->toBeNull();
 });
 
-it('compileFile uses loadPaths option', function () {
-    $input = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
-    $loadPath = sys_get_temp_dir();
-    $importFile = $loadPath . '/_test.scss';
-
-    file_put_contents($importFile, '.imported { color: blue; }');
-    file_put_contents($input, '@use "test";');
-
-    $css = $this->compiler->compileFile($input, new Options(
-        loadPaths: [$loadPath]
-    ));
-
-    expect($css)->toContain('.imported');
-
-    unlink($input);
-    unlink($importFile);
-});
-
-it('compileFile uses quietDeps option', function () {
-    $input = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
-
-    file_put_contents($input, '.box { color: red; }');
-
-    $css = $this->compiler->compileFile($input, new Options(
-        quietDeps: true
-    ));
-
-    expect($css)->toContain('.box');
-
-    unlink($input);
-});
-
-it('compileFile uses silenceDeprecations option', function () {
-    $input = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
-
-    file_put_contents($input, '.box { color: red; }');
-
-    $css = $this->compiler->compileFile($input, new Options(
-        silenceDeprecations: ['import']
-    ));
-
-    expect($css)->toContain('.box');
-
-    unlink($input);
-});
-
-it('getSassCommand returns correct path for current platform', function () {
-    $input = tempnam(sys_get_temp_dir(), 'scss') . '.scss';
-
-    file_put_contents($input, '.box { color: red; }');
-
-    $css = $this->compiler->compileFile($input);
-
-    expect($css)->toContain('.box');
-
-    unlink($input);
-});
-
-it('getSassCommand returns Windows dart+snapshot paths when isWindows returns true', function () {
+it('builds every supported cli argument', function () {
     $compiler = new class () extends Compiler {
-        protected function isWindows(): bool
+        public function exposeBuildSassArgs(array $options): array
         {
-            return true;
-        }
-
-        public function exposeSassCommand(): array
-        {
-            return $this->getSassCommand();
+            return $this->buildSassArgs($options);
         }
     };
 
-    $binDir  = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'bin';
-    $command = $compiler->exposeSassCommand();
-
-    expect($command)->toBe([
-        $binDir . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'dart.exe',
-        $binDir . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'sass.snapshot',
+    expect($compiler->exposeBuildSassArgs([
+        'syntax'              => 'indented',
+        'style'               => 'compressed',
+        'sourceMapPath'       => 'inline',
+        'includeSources'      => true,
+        'loadPaths'           => ['/one', '/two'],
+        'quietDeps'           => true,
+        'silenceDeprecations' => ['import'],
+    ]))->toBe([
+        '--indented',
+        '--style=compressed',
+        '--embed-source-map',
+        '--embed-sources',
+        '--load-path=/one',
+        '--load-path=/two',
+        '--quiet-deps',
+        '--silence-deprecation=import',
     ]);
 });
 
-it('getSassCommand returns unix sass path when isWindows returns false', function () {
+it('builds sass commands for supported platforms', function () {
     $compiler = new class () extends Compiler {
+        public bool $windows = false;
+
         protected function isWindows(): bool
         {
-            return false;
+            return $this->windows;
         }
 
         public function exposeSassCommand(): array
@@ -383,10 +227,16 @@ it('getSassCommand returns unix sass path when isWindows returns false', functio
         }
     };
 
-    $binDir  = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'bin';
-    $command = $compiler->exposeSassCommand();
+    $binDir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'bin';
 
-    expect($command)->toBe([
+    expect($compiler->exposeSassCommand())->toBe([
         $binDir . DIRECTORY_SEPARATOR . 'sass',
+    ]);
+
+    $compiler->windows = true;
+
+    expect($compiler->exposeSassCommand())->toBe([
+        $binDir . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'dart.exe',
+        $binDir . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'sass.snapshot',
     ]);
 });

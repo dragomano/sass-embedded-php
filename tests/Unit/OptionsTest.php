@@ -86,3 +86,45 @@ it('stores all options via constructor', function () {
         ->and($options->url)->toBe('file:///src/style.scss')
         ->and($options->sourceFile)->toBe('style.scss');
 });
+
+it('returns itself when no overrides are provided', function () {
+    $options = new Options(style: 'expanded');
+
+    expect($options->withOverrides(null))->toBe($options);
+});
+
+it('inherits null values and preserves explicit false and empty arrays', function () {
+    $defaults = new Options(
+        syntax: 'scss',
+        style: 'expanded',
+        includeSources: true,
+        loadPaths: ['/default'],
+        quietDeps: true,
+        silenceDeprecations: ['import'],
+        verbose: true,
+        sourceMapPath: 'inline',
+        url: 'file:///default.scss',
+        sourceFile: 'default.scss',
+    );
+
+    $merged = $defaults->withOverrides(new Options(
+        style: 'compressed',
+        includeSources: false,
+        loadPaths: [],
+        quietDeps: false,
+        silenceDeprecations: [],
+        verbose: false,
+        url: 'file:///override.scss',
+    ));
+
+    expect($merged->syntax)->toBe('scss')
+        ->and($merged->style)->toBe('compressed')
+        ->and($merged->includeSources)->toBeFalse()
+        ->and($merged->loadPaths)->toBe([])
+        ->and($merged->quietDeps)->toBeFalse()
+        ->and($merged->silenceDeprecations)->toBe([])
+        ->and($merged->verbose)->toBeFalse()
+        ->and($merged->sourceMapPath)->toBe('inline')
+        ->and($merged->url)->toBe('file:///override.scss')
+        ->and($merged->sourceFile)->toBe('default.scss');
+});

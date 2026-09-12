@@ -89,7 +89,7 @@ final class EmbeddedCompiler implements CompilerInterface
             return '';
         }
 
-        $options ??= $this->options;
+        $options = $this->options->withOverrides($options);
 
         $url = self::stringUrl($options);
 
@@ -112,7 +112,9 @@ final class EmbeddedCompiler implements CompilerInterface
             throw new Exception("File not found: $path");
         }
 
-        return $this->compile(self::field(3, $path), $options ?? $this->options, $path);
+        $options = $this->options->withOverrides($options);
+
+        return $this->compile(self::field(3, $path), $options, $path);
     }
 
     public function compileFileAndSave(string $inputPath, string $outputPath, ?Options $options = null): bool

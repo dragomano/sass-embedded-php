@@ -36,7 +36,7 @@ class Compiler implements CompilerInterface
             return '';
         }
 
-        $options = array_merge($this->resolveOptions(), $this->resolveOptions($options));
+        $options = $this->resolveOptions($options);
 
         return $this->compileSource($source, $options);
     }
@@ -47,7 +47,7 @@ class Compiler implements CompilerInterface
             throw new Exception("File not found: $path");
         }
 
-        $options = array_merge($this->resolveOptions(), $this->resolveOptions($options));
+        $options = $this->resolveOptions($options);
 
         return $this->compileFileNative($path, $options);
     }
@@ -93,7 +93,10 @@ class Compiler implements CompilerInterface
 
     protected function resolveOptions(?Options $options = null): array
     {
-        return array_filter((array) ($options ?? $this->options), static fn($value): bool => $value !== null);
+        return array_filter(
+            (array) $this->options->withOverrides($options),
+            static fn($value): bool => $value !== null
+        );
     }
 
     protected function compileSource(string $source, array $options): string
@@ -107,15 +110,15 @@ class Compiler implements CompilerInterface
         $out = trim($process->getOutput());
         $err = trim($process->getErrorOutput());
 
-        if ($err !== '' && $process->isSuccessful() === false) {
-            throw new Exception('Sass compilation error: ' . $err);
+        if (! $process->isSuccessful()) {
+            throw new Exception('Sass compilation error: ' . ($err ?: $out ?: 'unknown error'));
         }
 
-        if ($out === '') {
-            throw new Exception('Sass process failed: ' . ($err ?: 'unknown error'));
-        }
-
-        return $this->applySourceMap($out, $options, $options['sourceFile'] ?? $options['url'] ?? '');
+        return $this->applySourceMap(
+            $out,
+            $options,
+            $options['url'] ?? $options['sourceFile'] ?? ''
+        );
     }
 
     /**

@@ -18,4 +18,24 @@ readonly class Options
         public ?string $url = null,
         public ?string $sourceFile = null,
     ) {}
+
+    public function withOverrides(?self $overrides): self
+    {
+        if ($overrides === null) {
+            return $this;
+        }
+
+        return new self(
+            syntax: $overrides->syntax ?? $this->syntax,
+            style: $overrides->style ?? $this->style,
+            includeSources: $overrides->includeSources ?? $this->includeSources,
+            loadPaths: $overrides->loadPaths ?? $this->loadPaths,
+            quietDeps: $overrides->quietDeps ?? $this->quietDeps,
+            silenceDeprecations: $overrides->silenceDeprecations ?? $this->silenceDeprecations,
+            verbose: $overrides->verbose ?? $this->verbose,
+            sourceMapPath: $overrides->sourceMapPath ?? $this->sourceMapPath,
+            url: $overrides->url ?? $this->url,
+            sourceFile: $overrides->sourceFile ?? $this->sourceFile,
+        );
+    }
 }

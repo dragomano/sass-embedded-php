@@ -228,10 +228,9 @@ it('emits source maps in every supported sourceMapPath mode', function () {
 
     try {
         expect($this->compiler->compileFile($input))->not->toContain('sourceMappingURL')
-            ->and($this->compiler->getSourceMap())->toBeNull();
-
-        // A stylesheet that emits no CSS still carries a map, as the CLI itself does.
-        expect($this->compiler->compileFile($dir . '/vars.scss', new Options(sourceMapPath: 'inline')))
+            ->and($this->compiler->getSourceMap())->toBeNull()
+            // A stylesheet that emits no CSS still carries a map, as the CLI itself does.
+            ->and($this->compiler->compileFile($dir . '/vars.scss', new Options(sourceMapPath: 'inline')))
             ->toStartWith("\n\n/*# sourceMappingURL=data:application/json;base64,");
 
         $explicit = $this->compiler->compileFile($input, new Options(sourceMapPath: $dir . '/custom.map'));

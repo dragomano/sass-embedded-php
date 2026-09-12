@@ -69,8 +69,10 @@ namespace {
             expect($compiler->compileFileAndSave($input, $output))->toBeTrue()
                 ->and(file_get_contents($output))->toBe("a {\n  b: c;\n}")
                 ->and($compiler->compileFileAndSave($input, $output))->toBeFalse()
-                ->and(fn() => $compiler->compileFile($input . '.missing'))->toThrow(Exception::class, "File not found: $input.missing")
-                ->and(fn() => $compiler->compileFileAndSave($input . '.missing', $output))->toThrow(Exception::class, "Source file not found: $input.missing");
+                ->and(fn() => $compiler->compileFile($input . '.missing'))
+                ->toThrow(Exception::class, "File not found: $input.missing")
+                ->and(fn() => $compiler->compileFileAndSave($input . '.missing', $output))
+                ->toThrow(Exception::class, "Source file not found: $input.missing");
         } finally {
             $compiler->close();
             unlink($input);
@@ -115,7 +117,8 @@ namespace {
                 3 => [str_repeat('b', 4)],
                 4 => ['foo'],
             ])
-            ->and(fn() => invokeEmbedded('fields', "\x0b"))->toThrow(ProtocolException::class, 'Unsupported Dart Sass embedded protocol field type 3');
+            ->and(fn() => invokeEmbedded('fields', "\x0b"))
+            ->toThrow(ProtocolException::class, 'Unsupported Dart Sass embedded protocol field type 3');
     });
 
     it('encodes every supported compile option', function () {
@@ -131,10 +134,20 @@ namespace {
 
         $encoded = invokeEmbeddedOn(new EmbeddedCompiler(), 'compileOptions', $options);
 
-        expect($encoded)->toContain("\x48\x01", "\x68\x01", "\x50\x01", "\x58\x01", "\x20\x01", "\x28\x01", "\x60\x01", "\x32\x05\x0a\x03one", "\x32\x05\x0a\x03two", "\x82\x01\x06import");
-
-        // The `silent` field would suppress every LogEvent, including @warn and @debug.
-        expect($encoded)->not->toContain("\x70\x01");
+        expect($encoded)->toContain(
+            "\x48\x01",
+            "\x68\x01",
+            "\x50\x01",
+            "\x58\x01",
+            "\x20\x01",
+            "\x28\x01",
+            "\x60\x01",
+            "\x32\x05\x0a\x03one",
+            "\x32\x05\x0a\x03two",
+            "\x82\x01\x06import"
+        )
+            // The `silent` field would suppress every LogEvent, including @warn and @debug.
+            ->and($encoded)->not->toContain("\x70\x01");
     });
 
     it('resolves canonical urls and source map targets', function () {
@@ -294,25 +307,30 @@ namespace {
 
     it('rejects unsupported and mismatched embedded messages', function () {
         withEmbeddedOutput("\x03\x01\x22\x00", function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))->toThrow(ProtocolException::class, 'unsupported message');
+            expect(fn() => $compiler->compileString('a {}'))
+                ->toThrow(ProtocolException::class, 'unsupported message');
         });
 
         withEmbeddedOutput("\x08\x02\x12\x05\x12\x03\x0a\x01x", function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))->toThrow(ProtocolException::class, 'unexpected compilation');
+            expect(fn() => $compiler->compileString('a {}'))
+                ->toThrow(ProtocolException::class, 'unexpected compilation');
         });
     });
 
     it('reports stopped and timed out embedded processes with stderr', function () {
         withEmbeddedOutput('', function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))->toThrow(ProtocolException::class, 'stopped unexpectedly');
+            expect(fn() => $compiler->compileString('a {}'))
+                ->toThrow(ProtocolException::class, 'stopped unexpectedly');
         });
 
         withEmbeddedOutput("\x02", function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))->toThrow(ProtocolException::class, 'stopped unexpectedly');
+            expect(fn() => $compiler->compileString('a {}'))
+                ->toThrow(ProtocolException::class, 'stopped unexpectedly');
         });
 
         withEmbeddedOutput('', function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))->toThrow(ProtocolException::class, 'stderr: diagnostic');
+            expect(fn() => $compiler->compileString('a {}'))
+                ->toThrow(ProtocolException::class, 'stderr: diagnostic');
         }, timeout: 0.01, wait: true, stderr: 'diagnostic');
     });
 
@@ -347,6 +365,7 @@ namespace {
 
         $compiler = new EmbeddedCompiler();
         $stream   = fopen('php://memory', 'r+');
+
         setEmbeddedPipes($compiler, [$stream, $stream, $stream]);
 
         try {

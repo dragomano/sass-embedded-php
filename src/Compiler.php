@@ -6,20 +6,6 @@ namespace Bugo\Sass;
 
 use Symfony\Component\Process\Process;
 
-use function array_filter;
-use function array_merge;
-use function dirname;
-use function file_exists;
-use function file_put_contents;
-use function filemtime;
-use function is_array;
-use function json_decode;
-use function json_encode;
-use function preg_match;
-use function preg_replace;
-use function rawurldecode;
-use function trim;
-
 class Compiler implements CompilerInterface
 {
     use HandlesSourceMaps;
@@ -32,7 +18,7 @@ class Compiler implements CompilerInterface
 
     public function __construct(protected Options $options = new Options()) {}
 
-    public function setOptions(Options $options): static
+    public function setOptions(Options $options): self
     {
         $this->options = $options;
 
@@ -55,15 +41,15 @@ class Compiler implements CompilerInterface
         return $this->compileSource($source, $options);
     }
 
-    public function compileFile(string $filePath, ?Options $options = null): string
+    public function compileFile(string $path, ?Options $options = null): string
     {
-        if (! file_exists($filePath)) {
-            throw new Exception("File not found: $filePath");
+        if (! file_exists($path)) {
+            throw new Exception("File not found: $path");
         }
 
         $options = array_merge($this->resolveOptions(), $this->resolveOptions($options));
 
-        return $this->compileFileNative($filePath, $options);
+        return $this->compileFileNative($path, $options);
     }
 
     public function compileFileAndSave(string $inputPath, string $outputPath, ?Options $options = null): bool
@@ -77,6 +63,7 @@ class Compiler implements CompilerInterface
 
         if ($inputMtime > $outputMtime) {
             $css = $this->compileFile($inputPath, $options);
+
             file_put_contents($outputPath, $css);
 
             return true;

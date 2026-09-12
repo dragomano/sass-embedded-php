@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Bugo\Sass\CompilerInterface;
 use Bugo\Sass\EmbeddedCompiler;
 use Bugo\Sass\Options;
+use Random\RandomException;
 
 $specDir = getenv('SASS_SPEC_DIR') ?: dirname(__DIR__, 2) . '/spec';
 
@@ -65,7 +66,8 @@ if (getenv('RUN_SASS_SPEC') && is_dir($specDir)) {
 /**
  * Collects spec files grouped into batches of ~100 for manageable describe blocks.
  *
- * @return array<string, list{absolute: string, relative: string}>
+ * @param string $specDir
+ * @return array
  */
 function collectSpecFilesGrouped(string $specDir): array
 {
@@ -111,9 +113,9 @@ function collectSpecFilesGrouped(string $specDir): array
         $rangeEnd   = $rangeStart + count($batchFiles) - 1;
 
         if ($firstDir === $lastDir) {
-            $label = "{$firstDir} [{$rangeStart}-{$rangeEnd}]";
+            $label = "$firstDir [$rangeStart-$rangeEnd]";
         } else {
-            $label = "{$firstDir}–{$lastDir} [{$rangeStart}-{$rangeEnd}]";
+            $label = "{$firstDir}–$lastDir [$rangeStart-$rangeEnd]";
         }
 
         $grouped[$label] = $batchFiles;
@@ -268,6 +270,7 @@ function isSpecInputFileName(string $relativePath): bool
  * relative imports that climb up with `../` and spec-root-based `@use`
  * paths resolve exactly like they do in the real suite. The temp directory
  * itself is passed as a load path so spec-root-relative imports work too.
+ * @throws RandomException
  */
 function compileWithSupportFiles(CompilerInterface $compiler, string $inputRelPath, string $inputSource, array $supportFiles): string
 {
@@ -290,6 +293,9 @@ function compileWithSupportFiles(CompilerInterface $compiler, string $inputRelPa
     }
 }
 
+/**
+ * @throws RandomException
+ */
 function createTempSpecDir(): string
 {
     $dir = sys_get_temp_dir() . '/sass-spec-' . bin2hex(random_bytes(8));
@@ -361,11 +367,11 @@ function parseHrxEntries(string $content): array
 
             if ($path === '' || $path === 'README.md') {
                 $currentPath  = null;
-                $currentLines = [];
             } else {
                 $currentPath  = $path;
-                $currentLines = [];
             }
+
+            $currentLines = [];
         } elseif ($currentPath !== null) {
             $currentLines[] = $line;
         }

@@ -97,9 +97,42 @@ if (is_dir($specDir)) {
 }
 
 copyDirectory($extractedSpec, $specDir);
+markKnownUnsupportedSpecs($specDir);
 removeDirectory($tempDir);
 
 echo "Done. spec/ updated to {$ref}\n";
+
+/**
+ * The latest sass-spec main can contain expectations for fixes that have not
+ * reached the latest stable Dart Sass release yet. Mark only those exact cases
+ * as todo so the rest of the suite continues to run.
+ */
+function markKnownUnsupportedSpecs(string $specDir): void
+{
+    $path    = $specDir . '/directives/use/comment.hrx';
+    $content = @file_get_contents($path);
+
+    if ($content === false) {
+        return;
+    }
+
+    $cases = [
+        'loud/repeated_use' => 'sass/dart-sass#2851',
+        'loud/skip'         => 'sass/dart-sass#2851',
+    ];
+
+    foreach ($cases as $case => $reason) {
+        $header = "<===> {$case}/options.yml";
+
+        if (str_contains($content, $header)) {
+            continue;
+        }
+
+        $content .= "\n{$header}\n:todo: {$reason}\n";
+    }
+
+    file_put_contents($path, $content);
+}
 
 function copyDirectory(string $source, string $destination, array $excludePatterns = []): void
 {

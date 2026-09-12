@@ -33,8 +33,13 @@ trait HandlesSourceMaps
         return $this->sourceMap;
     }
 
-    protected function emitSourceMap(string $css, string $map, ?string $target, bool $compressed, string $name): string
-    {
+    protected function emitSourceMap(
+        string $css,
+        string $map,
+        ?string $target,
+        bool $compressed,
+        string $name,
+    ): string {
         $this->sourceMap = $map === '' ? null : $map;
 
         if ($map === '' || ! self::wantsSourceMap($target)) {
@@ -44,7 +49,11 @@ trait HandlesSourceMaps
         $target = (string) $target;
 
         if ($target === 'inline') {
-            return self::withSourceMapComment($css, 'data:application/json;base64,' . base64_encode($map), $compressed);
+            return self::withSourceMapComment(
+                $css,
+                'data:application/json;base64,' . base64_encode($map),
+                $compressed
+            );
         }
 
         if (self::hasUrlScheme($target)) {
@@ -79,7 +88,11 @@ trait HandlesSourceMaps
             return $target;
         }
 
-        $base = (string) preg_replace('/\.(?:s[ac]ss|css)$/i', '', basename(str_replace('\\', '/', $name)));
+        $base = (string) preg_replace(
+            '/\.(?:s[ac]ss|css)$/i',
+            '',
+            basename(str_replace('\\', '/', $name))
+        );
 
         return rtrim($normalized, '/') . '/' . ($base === '' ? 'style' : $base) . '.css.map';
     }

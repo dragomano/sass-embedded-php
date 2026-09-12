@@ -16,26 +16,6 @@ use RuntimeException;
 use Symfony\Component\Process\Process;
 use ZipArchive;
 
-use function basename;
-use function file_get_contents;
-use function file_put_contents;
-use function getenv;
-use function implode;
-use function is_dir;
-use function is_file;
-use function json_decode;
-use function ltrim;
-use function mkdir;
-use function php_uname;
-use function realpath;
-use function rename;
-use function rmdir;
-use function scandir;
-use function sprintf;
-use function stream_context_create;
-use function trim;
-use function unlink;
-
 class Plugin implements PluginInterface, EventSubscriberInterface
 {
     private const PACKAGE_NAME = 'sass-embedded-php';

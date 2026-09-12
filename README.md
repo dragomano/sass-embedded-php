@@ -5,213 +5,233 @@
 
 [По-русски](README.ru.md)
 
-Allows compiling SCSS/SASS to CSS through PHP using native Dart Sass.
+Compile SCSS/SASS to CSS from PHP using native Dart Sass. The package provides a reusable embedded-protocol compiler and a simple CLI compiler with the same compilation contract.
 
 ---
 
-## Installation via Composer
+## Installation
 
 ```bash
 composer require bugo/sass-embedded-php
 ```
 
-## Usage examples
+The matching native Dart Sass binary is installed into the package automatically.
 
-### Compiling SCSS file
+## Choosing a compiler
 
-```php
-<?php
-require __DIR__ . '/vendor/autoload.php';
+| Scenario | Recommended implementation |
+|---|---|
+| Repeated compilation, queue worker, daemon, or batch | `EmbeddedCompiler` |
+| One-off script with the simplest lifecycle | `Compiler` |
+| Existing integration that already uses the CLI implementation | `Compiler` |
+| Highest throughput from a reused process | `EmbeddedCompiler` |
 
-use Bugo\Sass\Compiler;
+Both classes implement `CompilerInterface` and expose the same option and compilation methods. `Compiler` starts a Dart Sass CLI process for every compilation. `EmbeddedCompiler` speaks the embedded protocol and can reuse one process across many compilations.
 
-$compiler = new Compiler();
+`EmbeddedCompiler` is the recommended implementation when the instance can be reused. `Compiler` remains supported for simple scripts and backwards compatibility.
 
-$css = $compiler->compileFile(__DIR__ . '/assets/app.scss');
+## Recommended usage
 
-file_put_contents(__DIR__ . '/assets/app.css', $css);
-
-echo "CSS compiled!\n";
-```
-
-### Compiling SCSS from string
+### Reusing EmbeddedCompiler
 
 ```php
 <?php
+
+declare(strict_types=1);
+
 require __DIR__ . '/vendor/autoload.php';
 
-use Bugo\Sass\Compiler;
-
-$compiler = new Compiler();
-
-$scss = '$color: red; body { color: $color; }';
-$css = $compiler->compileString($scss);
-
-echo $css;
-```
-
-### Compiling string with options
-
-```php
-<?php
-require __DIR__ . '/vendor/autoload.php';
-
-use Bugo\Sass\Compiler;
+use Bugo\Sass\EmbeddedCompiler;
 use Bugo\Sass\Options;
 
-$compiler = new Compiler();
+$compiler = new EmbeddedCompiler(
+    options: new Options(style: 'compressed')
+);
 
-$scss = <<<'SCSS'
-$color: #3498db;
-$font-size: 14px;
-
-body {
-  font-size: $font-size;
-  color: $color;
+try {
+    foreach ($sources as $source) {
+        $results[] = $compiler->compileString($source);
+    }
+} finally {
+    $compiler->close();
 }
-SCSS;
+```
 
-$compiler->setOptions(new Options(
-    style: 'compressed',
-    sourceMapPath: 'inline',
-));
+Reuse the instance instead of constructing one compiler per item. Call `close()` in a `finally` block so the native process is released after success or failure. The destructor is a fallback, not the preferred lifecycle mechanism for long-running PHP processes.
 
-$css = $compiler->compileString($scss);
+### Compiling a file with EmbeddedCompiler
+
+```php
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Bugo\Sass\EmbeddedCompiler;
+
+$compiler = new EmbeddedCompiler();
+
+try {
+    $css = $compiler->compileFile(__DIR__ . '/assets/app.scss');
+    file_put_contents(__DIR__ . '/assets/app.css', $css);
+} finally {
+    $compiler->close();
+}
+```
+
+### Simple one-off CLI compilation
+
+```php
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Bugo\Sass\Compiler;
+
+$compiler = new Compiler();
+$css      = $compiler->compileString('$color: red; body { color: $color; }');
 
 echo $css;
 ```
 
-### Catching compilation errors
+`Compiler` does not keep a child process open and therefore does not require an explicit `close()` call.
+
+## Common operations
+
+### Compiling and saving only when the source changed
 
 ```php
+<?php
+
+declare(strict_types=1);
+
 require __DIR__ . '/vendor/autoload.php';
 
+use Bugo\Sass\EmbeddedCompiler;
 use Bugo\Sass\Exception;
-use Bugo\Sass\Compiler;
 
-$compiler = new Compiler();
-
-$scss = <<<'SCSS'
-$color: #e74c3c;
-.foo { color: $color; }
-SCSS;
+$compiler = new EmbeddedCompiler();
 
 try {
-    echo $compiler->compileString($scss);
-} catch (Exception $e) {
-    echo "Compilation error: " . $e->getMessage();
-}
-```
-
-### Compiling SCSS file with change checking
-
-```php
-require __DIR__ . '/vendor/autoload.php';
-
-use Bugo\Sass\Exception;
-use Bugo\Sass\Compiler;
-
-$compiler = new Compiler();
-
-try {
-    $done = $compiler->compileFileAndSave(
+    $compiled = $compiler->compileFileAndSave(
         __DIR__ . '/assets/style.scss',
         __DIR__ . '/assets/style.css',
     );
 
-    if ($done) {
-        echo "CSS recompiled and saved.\n";
-    } else {
-        echo "No changes detected, skipped compilation.\n";
-    }
+    echo $compiled ? "CSS recompiled.\n" : "No changes detected.\n";
 } catch (Exception $e) {
-    echo "Compilation error: " . $e->getMessage();
+    echo 'Compilation error: ' . $e->getMessage();
+} finally {
+    $compiler->close();
 }
 ```
 
-This method automatically checks if the source file has been modified since the last compilation and only compiles and saves if changes are detected.
-
-### Compiling file with source maps and compressed output
+### Source maps and compressed output
 
 ```php
 <?php
+
+declare(strict_types=1);
+
 require __DIR__ . '/vendor/autoload.php';
 
-use Bugo\Sass\Compiler;
+use Bugo\Sass\EmbeddedCompiler;
 use Bugo\Sass\Options;
 
-$compiler = new Compiler();
+$compiler = new EmbeddedCompiler(
+    options: new Options(
+        style: 'compressed',
+        includeSources: true,
+        sourceMapPath: 'inline',
+    )
+);
 
-$compiler->setOptions(new Options(
-    style: 'compressed',
-    includeSources: true,
-    sourceMapPath: __DIR__ . '/assets/',
-));
-
-$css = $compiler->compileFile(__DIR__ . '/assets/app.scss');
-
-file_put_contents(__DIR__ . '/assets/app.css', $css);
-
-echo "CSS compiled with source map!\n";
-```
-
-### Compiling string with inline source map
-
-```php
-<?php
-require __DIR__ . '/vendor/autoload.php';
-
-use Bugo\Sass\Compiler;
-use Bugo\Sass\Options;
-
-$compiler = new Compiler();
-
-$compiler->setOptions(new Options(
-    sourceMapPath: 'inline',
-    includeSources: true,
-));
-
-$css = $compiler->compileString('$color: red; body { color: $color; }');
-
-echo $css;
+try {
+    $css = $compiler->compileString('$color: red; body { color: $color; }');
+} finally {
+    $compiler->close();
+}
 ```
 
 ## Options
 
-The compiler uses the native Dart Sass binary installed into the package automatically:
+| Option | Type | Description | Possible values | Effective default |
+|---|---|---|---|---|
+| syntax | string | Input syntax | `scss`, `indented`, or `sass` | `scss` |
+| style | string | Output style | `compressed` or `expanded` | `expanded` |
+| includeSources | bool | Include source code in a source map | `true` or `false` | `false` |
+| loadPaths | array<string> | Paths used to resolve Sass imports | `['./libs', './node_modules']` | `[]` |
+| quietDeps | bool | Suppress warnings from dependencies | `true` or `false` | `false` |
+| silenceDeprecations | array<string> | Sass deprecations to suppress | `['import', 'color-functions']` | `[]` |
+| verbose | bool | Enable verbose Sass messages | `true` or `false` | `false` |
+| sourceMapPath | string | `inline`, URL, directory, or source-map file path |  | disabled |
+| url | string | Source URL used by Sass and source maps | file or HTTP(S) URL | automatic for `compileFile()` |
+| sourceFile | string | Virtual source filename for bridge processing | for example `style.scss` | internal bridge default |
+
+Options can be configured for the compiler instance and overridden for one method call:
 
 ```php
-$compiler = new Compiler();
-```
-
-| Option              | Type          | Description                                                | Possible values                                | Default                                             |
-|---------------------|---------------|------------------------------------------------------------|------------------------------------------------|-----------------------------------------------------|
-| syntax              | string        | Input syntax                                               | 'scss' for SCSS, 'indented' or 'sass' for SASS | `scss`                                              |
-| style               | string        | Output style                                               | 'compressed' or 'expanded'                     | `expanded`                                          |
-| includeSources      | bool          | Include source code in map                                 | true or false                                  | `false`                                             |
-| loadPaths           | array<string> | Array of paths for searching Sass imports                  | `['./libs', './node_modules']`                 | `[]`                                                |
-| quietDeps           | bool          | Suppresses warnings from dependencies                      | true or false                                  | `false`                                             |
-| silenceDeprecations | array<string> | Suppresses warnings about specific deprecations            | `['import', 'color-functions']`                | `[]`                                                |
-| verbose             | bool          | Enables verbose output of messages                         | true or false                                  | `false`                                             |
-| sourceMapPath       | string        | `inline`, URL, directory, or file path for source map      |                                                | disabled                                            |
-| url                 | string        | Sets the source URL used by Sass and source maps           | file or HTTP(S) URL                            | auto in `compileFile()`, unset in `compileString()` |
-| sourceFile          | string        | Sets the virtual source filename for bridge processing     | e.g. `style.scss`                              | internal bridge default                             |
-
-Options are passed only as an `Options` object, either for the entire compiler or for a specific method call:
-
-```php
+use Bugo\Sass\EmbeddedCompiler;
 use Bugo\Sass\Options;
 
-$compiler->setOptions(new Options(
-    syntax: 'indented',
-    style: 'compressed',
-    sourceMapPath: '/out/style.map',
-));
+$compiler = new EmbeddedCompiler(
+    options: new Options(
+        style: 'expanded',
+        quietDeps: true,
+        loadPaths: ['/project/styles'],
+    )
+);
 
-$css = $compiler->compileString($scss, new Options(
-    style: 'compressed',
-    sourceMapPath: 'inline',
-));
+try {
+    $css = $compiler->compileString($scss, new Options(
+        style: 'compressed',
+        quietDeps: false,
+        loadPaths: [],
+    ));
+} finally {
+    $compiler->close();
+}
 ```
 
-All available options in `Options` default to `null`, which means the option was not explicitly set. The `Default` column describes the effective compiler behavior in that case.
+Method-level options are merged with instance defaults:
+
+- `null` inherits the instance value;
+- `false` explicitly overrides a boolean instance value;
+- `[]` explicitly clears an array instance value;
+- `url` takes precedence over the compatibility `sourceFile` value;
+- successfully compiling comment-only input returns an empty string.
+
+## Errors and process lifecycle
+
+Compilation failures throw `Bugo\Sass\Exception`. Embedded transport and protocol failures use more specific exception types while remaining compilation failures from the caller's perspective.
+
+`EmbeddedCompiler` manages process startup, protocol framing, recovery from compiler-owned transport failures, and graceful shutdown. In long-running applications:
+
+1. create one compiler for a defined worker or batch lifetime;
+2. reuse it for related compilations;
+3. call `close()` from `finally` during shutdown;
+4. do not rely on the PHP destructor as the primary cleanup strategy.
+
+See [Process lifecycle and reliability](docs/process-lifecycle.md) for recovery and shutdown details.
+
+## Benchmark
+
+The included benchmark compares cold startup and warm process reuse for `Compiler`, `EmbeddedCompiler`, and `scssphp/scssphp` across string and file inputs.
+
+```bash
+composer benchmark
+php benchmark.php --runs=20 --warmup=3 --batch=2
+```
+
+The benchmark validates matching CLI and embedded Dart Sass output before timing. Results depend on hardware and environment; run it locally rather than treating one machine's numbers as a universal guarantee.
+
+See [Benchmark methodology](docs/benchmark-methodology.md) and [the generated report](benchmark.md).
+
+## Documentation
+
+- [Compiler contract](docs/compiler-contract.md)
+- [Process lifecycle and reliability](docs/process-lifecycle.md)
+- [Benchmark methodology](docs/benchmark-methodology.md)

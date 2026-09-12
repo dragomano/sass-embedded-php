@@ -6,7 +6,7 @@
 bin/
 composer.lock
 package-lock.json
-generated.scss
+generated*.scss
 coverage.xml
 result*
 coverage/

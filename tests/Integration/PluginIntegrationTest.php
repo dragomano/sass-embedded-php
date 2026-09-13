@@ -42,7 +42,7 @@ final class FakeDownloadSassPlugin extends Plugin
     {
         return json_encode(
             ['tag_name' => 'v' . $this->fakeLatestVersion],
-            JSON_THROW_ON_ERROR
+            JSON_THROW_ON_ERROR,
         );
     }
 
@@ -75,7 +75,7 @@ function createLinuxFixtureArchive(string $tmpDir): string
     $archivePath = $tmpDir . '/dart-sass-fixture.tar.gz';
 
     $process = new Process(
-        ['tar', '-czf', $archivePath, '-C', $tmpDir . '/fixture-source', 'dart-sass']
+        ['tar', '-czf', $archivePath, '-C', $tmpDir . '/fixture-source', 'dart-sass'],
     );
     $process->run();
 
@@ -150,8 +150,7 @@ beforeEach(function () {
             default        => null,
         });
 
-    $this->composer->shouldReceive('getConfig')
-        ->andReturn($this->config);
+    $this->composer->shouldReceive('getConfig')->andReturn($this->config);
 
     $this->tmpDir = sys_get_temp_dir() . '/sass-plugin-test-' . uniqid('', true);
 

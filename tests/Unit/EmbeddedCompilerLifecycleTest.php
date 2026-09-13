@@ -45,8 +45,10 @@ namespace {
                 usleep(10_000);
             } while (microtime(true) < $deadline);
 
-            expect($compiler->compileString('a { b: d }'))->toBe("a {\n  b: d;\n}")
-                ->and($processProperty->getValue($compiler))->not->toBe($firstProcess);
+            expect($compiler->compileString('a { b: d }'))
+                ->toBe("a {\n  b: d;\n}")
+                ->and($processProperty->getValue($compiler))
+                ->not->toBe($firstProcess);
         } finally {
             $compiler->close();
         }
@@ -66,8 +68,8 @@ namespace {
 
     it('reads split varints and preserves coalesced frames in its buffer', function () {
         $largeMessage = str_repeat('x', 130);
-        $largeFrame = lifecycleFrame(7, $largeMessage);
-        $script = sprintf(
+        $largeFrame   = lifecycleFrame(7, $largeMessage);
+        $script       = sprintf(
             'fwrite(STDOUT, base64_decode(%s)); fflush(STDOUT); usleep(20000); fwrite(STDOUT, base64_decode(%s)); fflush(STDOUT); usleep(200000);',
             var_export(base64_encode($largeFrame[0]), true),
             var_export(base64_encode(substr($largeFrame, 1)), true),
@@ -92,8 +94,10 @@ namespace {
         setLifecycleProcess($compiler, $process, $pipes);
 
         try {
-            expect(invokeLifecycleOn($compiler, 'readMessage', microtime(true) + 2))->toBe([8, 'first'])
-                ->and(invokeLifecycleOn($compiler, 'readMessage', microtime(true) + 2))->toBe([9, 'second']);
+            expect(invokeLifecycleOn($compiler, 'readMessage', microtime(true) + 2))
+                ->toBe([8, 'first'])
+                ->and(invokeLifecycleOn($compiler, 'readMessage', microtime(true) + 2))
+                ->toBe([9, 'second']);
         } finally {
             $compiler->close();
         }
@@ -121,8 +125,7 @@ namespace {
 
         $compiler->close();
 
-        expect($GLOBALS['embedded_proc_terminate_calls'])->toBe(0)
-            ->and(is_resource($process))->toBeFalse();
+        expect($GLOBALS['embedded_proc_terminate_calls'])->toBe(0)->and(is_resource($process))->toBeFalse();
     });
 
     it('terminates a child that ignores graceful shutdown', function () {
@@ -134,8 +137,7 @@ namespace {
 
         $compiler->close();
 
-        expect($GLOBALS['embedded_proc_terminate_calls'])->toBe(1)
-            ->and(is_resource($process))->toBeFalse();
+        expect($GLOBALS['embedded_proc_terminate_calls'])->toBe(1)->and(is_resource($process))->toBeFalse();
     });
 
     it('closes its child from the destructor even through a log handler cycle', function () {
@@ -152,11 +154,18 @@ namespace {
 
     function spawnLifecycleProcess(string $script): array
     {
-        $process = proc_open([PHP_BINARY, '-r', $script], [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ], $pipes, null, null, ['bypass_shell' => true]);
+        $process = proc_open(
+            [PHP_BINARY, '-r', $script],
+            [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ],
+            $pipes,
+            null,
+            null,
+            ['bypass_shell' => true],
+        );
 
         foreach ($pipes as $pipe) {
             stream_set_blocking($pipe, false);
@@ -194,8 +203,8 @@ namespace {
         $encoded = '';
 
         do {
-            $byte = $value & 0x7f;
-            $value >>= 7;
+            $byte    = $value & 0x7f;
+            $value   >>= 7;
             $encoded .= chr($value === 0 ? $byte : $byte | 0x80);
         } while ($value !== 0);
 

@@ -16,7 +16,7 @@ use Symfony\Component\Process\Process;
 
 function makePluginWithPlatform(string $osFamily, string $machine): Plugin
 {
-    return new class ($osFamily, $machine) extends Plugin {
+    return new class($osFamily, $machine) extends Plugin {
         public function __construct(
             private readonly string $fakeOsFamily,
             private readonly string $fakeMachine,
@@ -41,8 +41,10 @@ function makePluginWithPlatform(string $osFamily, string $machine): Plugin
 
 function makePluginWithOs(string $osFamily): Plugin
 {
-    return new class ($osFamily) extends Plugin {
-        public function __construct(private readonly string $fakeOsFamily) {}
+    return new class($osFamily) extends Plugin {
+        public function __construct(
+            private readonly string $fakeOsFamily,
+        ) {}
 
         protected function getOsFamily(): string
         {
@@ -63,8 +65,10 @@ function makePluginWithOs(string $osFamily): Plugin
 
 function makePluginForFlatten(array $overrides = []): Plugin
 {
-    return new class ($overrides) extends Plugin {
-        public function __construct(private readonly array $overrides) {}
+    return new class($overrides) extends Plugin {
+        public function __construct(
+            private readonly array $overrides,
+        ) {}
 
         protected function scandirPath(string $path): array|false
         {
@@ -90,8 +94,10 @@ function makePluginForFlatten(array $overrides = []): Plugin
 
 function makePluginForRemove(array $overrides = []): Plugin
 {
-    return new class ($overrides) extends Plugin {
-        public function __construct(private readonly array $overrides) {}
+    return new class($overrides) extends Plugin {
+        public function __construct(
+            private readonly array $overrides,
+        ) {}
 
         protected function unlinkPath(string $path): bool
         {
@@ -117,7 +123,7 @@ function makePluginForRemove(array $overrides = []): Plugin
 
 function makePluginForFetchUrl(?Composer $composer, ?IOInterface $io): Plugin
 {
-    return new class ($composer, $io) extends Plugin {
+    return new class($composer, $io) extends Plugin {
         public array $capturedContextOptions = [];
 
         public function __construct(?Composer $composer, ?IOInterface $io)
@@ -163,22 +169,31 @@ it('implements EventSubscriberInterface', function () {
 it('returns subscribed events', function () {
     $events = Plugin::getSubscribedEvents();
 
-    expect($events)->toBeArray()
-        ->and($events)->toHaveKey(PackageEvents::POST_PACKAGE_INSTALL)
-        ->and($events)->toHaveKey(PackageEvents::POST_PACKAGE_UPDATE)
-        ->and($events)->toHaveKey(ScriptEvents::POST_AUTOLOAD_DUMP)
-        ->and($events[PackageEvents::POST_PACKAGE_INSTALL])->toBe('onPackageEvent')
-        ->and($events[PackageEvents::POST_PACKAGE_UPDATE])->toBe('onPackageEvent')
-        ->and($events[ScriptEvents::POST_AUTOLOAD_DUMP])->toBe('onScriptEvent');
+    expect($events)
+        ->toBeArray()
+        ->and($events)
+        ->toHaveKey(PackageEvents::POST_PACKAGE_INSTALL)
+        ->and($events)
+        ->toHaveKey(PackageEvents::POST_PACKAGE_UPDATE)
+        ->and($events)
+        ->toHaveKey(ScriptEvents::POST_AUTOLOAD_DUMP)
+        ->and($events[PackageEvents::POST_PACKAGE_INSTALL])
+        ->toBe('onPackageEvent')
+        ->and($events[PackageEvents::POST_PACKAGE_UPDATE])
+        ->toBe('onPackageEvent')
+        ->and($events[ScriptEvents::POST_AUTOLOAD_DUMP])
+        ->toBe('onScriptEvent');
 });
 
 it('activates plugin and initializes paths', function () {
-    $this->config->shouldReceive('get')
+    $this->config
+        ->shouldReceive('get')
         ->with('bin-dir')
         ->once()
         ->andReturn('vendor/bin');
 
-    $this->composer->shouldReceive('getConfig')
+    $this->composer
+        ->shouldReceive('getConfig')
         ->once()
         ->andReturn($this->config);
 
@@ -202,24 +217,27 @@ it('uninstall does nothing', function () {
 it('onPackageEvent triggers installation when sass not installed', function () {
     $packageEvent = mock(PackageEvent::class);
 
-    $this->config->shouldReceive('get')
+    $this->config
+        ->shouldReceive('get')
         ->with('bin-dir')
         ->once()
         ->andReturn('vendor/bin');
 
-    $this->config->shouldReceive('get')
+    $this->config
+        ->shouldReceive('get')
         ->with('github-oauth')
         ->zeroOrMoreTimes()
         ->andReturn([]);
 
-    $this->composer->shouldReceive('getConfig')
-        ->andReturn($this->config);
+    $this->composer->shouldReceive('getConfig')->andReturn($this->config);
 
-    $packageEvent->shouldReceive('getComposer')
+    $packageEvent
+        ->shouldReceive('getComposer')
         ->once()
         ->andReturn($this->composer);
 
-    $packageEvent->shouldReceive('getIO')
+    $packageEvent
+        ->shouldReceive('getIO')
         ->once()
         ->andReturn($this->io);
 
@@ -228,8 +246,10 @@ it('onPackageEvent triggers installation when sass not installed', function () {
     $tmpDir = sys_get_temp_dir() . '/sass-unit-test-' . uniqid();
     mkdir($tmpDir, 0777, true);
 
-    $plugin = new class ($tmpDir) extends Plugin {
-        public function __construct(private readonly string $fakeBaseDir) {}
+    $plugin = new class($tmpDir) extends Plugin {
+        public function __construct(
+            private readonly string $fakeBaseDir,
+        ) {}
 
         protected function getPackagePath(): string
         {
@@ -261,7 +281,7 @@ it('onPackageEvent triggers installation when sass not installed', function () {
 });
 
 it('getOsFamily returns the real PHP_OS_FAMILY constant', function () {
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         public function exposeGetOsFamily(): string
         {
             return $this->getOsFamily();
@@ -272,7 +292,7 @@ it('getOsFamily returns the real PHP_OS_FAMILY constant', function () {
 });
 
 it('getMachine returns the real php_uname value', function () {
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         public function exposeGetMachine(): string
         {
             return $this->getMachine();
@@ -283,14 +303,14 @@ it('getMachine returns the real php_uname value', function () {
 });
 
 it('getPackagePath returns realpath set during activate', function () {
-    $this->config->shouldReceive('get')
+    $this->config
+        ->shouldReceive('get')
         ->with('bin-dir')
         ->andReturn('vendor/bin');
 
-    $this->composer->shouldReceive('getConfig')
-        ->andReturn($this->config);
+    $this->composer->shouldReceive('getConfig')->andReturn($this->config);
 
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         public function exposeGetPackagePath(): string
         {
             return $this->getPackagePath();
@@ -306,7 +326,7 @@ it('doFileGetContents reads content via the real file_get_contents call', functi
     $tmpFile = sys_get_temp_dir() . '/plugin-do-file-get-contents-' . uniqid() . '.txt';
     file_put_contents($tmpFile, 'hello-from-real-implementation');
 
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         public function exposeDoFileGetContents(string $url, mixed $context): string|false
         {
             return $this->doFileGetContents($url, $context);
@@ -325,7 +345,7 @@ it('fetchFileContent builds a stream context with SSL verification options', fun
     $tmpFile = sys_get_temp_dir() . '/plugin-fetch-file-content-' . uniqid() . '.txt';
     file_put_contents($tmpFile, 'archive-bytes');
 
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         public array $capturedContextOptions = [];
 
         protected function doFileGetContents(string $url, mixed $context): string|false
@@ -343,10 +363,14 @@ it('fetchFileContent builds a stream context with SSL verification options', fun
 
     $result = $plugin->exposeFetchFileContent($tmpFile);
 
-    expect($result)->toBe('archive-bytes')
-        ->and($plugin->capturedContextOptions['http']['header'])->toContain('User-Agent: sass-embedded-php')
-        ->and($plugin->capturedContextOptions['ssl']['verify_peer'])->toBeTrue()
-        ->and($plugin->capturedContextOptions['ssl']['verify_peer_name'])->toBeTrue();
+    expect($result)
+        ->toBe('archive-bytes')
+        ->and($plugin->capturedContextOptions['http']['header'])
+        ->toContain('User-Agent: sass-embedded-php')
+        ->and($plugin->capturedContextOptions['ssl']['verify_peer'])
+        ->toBeTrue()
+        ->and($plugin->capturedContextOptions['ssl']['verify_peer_name'])
+        ->toBeTrue();
 
     unlink($tmpFile);
 });
@@ -354,18 +378,20 @@ it('fetchFileContent builds a stream context with SSL verification options', fun
 it('onScriptEvent calls getComposer and getIO', function () {
     $scriptEvent = mock(Event::class);
 
-    $this->config->shouldReceive('get')
+    $this->config
+        ->shouldReceive('get')
         ->with('bin-dir')
         ->andReturn('vendor/bin');
 
-    $this->composer->shouldReceive('getConfig')
-        ->andReturn($this->config);
+    $this->composer->shouldReceive('getConfig')->andReturn($this->config);
 
-    $scriptEvent->shouldReceive('getComposer')
+    $scriptEvent
+        ->shouldReceive('getComposer')
         ->once()
         ->andReturn($this->composer);
 
-    $scriptEvent->shouldReceive('getIO')
+    $scriptEvent
+        ->shouldReceive('getIO')
         ->once()
         ->andReturn($this->io);
 
@@ -378,18 +404,20 @@ it('onScriptEvent calls getComposer and getIO', function () {
 it('installBinary static method calls getComposer and getIO', function () {
     $scriptEvent = mock(Event::class);
 
-    $this->config->shouldReceive('get')
+    $this->config
+        ->shouldReceive('get')
         ->with('bin-dir')
         ->andReturn('vendor/bin');
 
-    $this->composer->shouldReceive('getConfig')
-        ->andReturn($this->config);
+    $this->composer->shouldReceive('getConfig')->andReturn($this->config);
 
-    $scriptEvent->shouldReceive('getComposer')
+    $scriptEvent
+        ->shouldReceive('getComposer')
         ->once()
         ->andReturn($this->composer);
 
-    $scriptEvent->shouldReceive('getIO')
+    $scriptEvent
+        ->shouldReceive('getIO')
         ->once()
         ->andReturn($this->io);
 
@@ -402,26 +430,30 @@ it('runInstall executes only once', function () {
     $scriptEvent1 = mock(Event::class);
     $scriptEvent2 = mock(Event::class);
 
-    $this->config->shouldReceive('get')
+    $this->config
+        ->shouldReceive('get')
         ->with('bin-dir')
         ->andReturn('vendor/bin');
 
-    $this->composer->shouldReceive('getConfig')
-        ->andReturn($this->config);
+    $this->composer->shouldReceive('getConfig')->andReturn($this->config);
 
-    $scriptEvent1->shouldReceive('getComposer')
+    $scriptEvent1
+        ->shouldReceive('getComposer')
         ->once()
         ->andReturn($this->composer);
 
-    $scriptEvent1->shouldReceive('getIO')
+    $scriptEvent1
+        ->shouldReceive('getIO')
         ->once()
         ->andReturn($this->io);
 
-    $scriptEvent2->shouldReceive('getComposer')
+    $scriptEvent2
+        ->shouldReceive('getComposer')
         ->once()
         ->andReturn($this->composer);
 
-    $scriptEvent2->shouldReceive('getIO')
+    $scriptEvent2
+        ->shouldReceive('getIO')
         ->once()
         ->andReturn($this->io);
 
@@ -435,18 +467,20 @@ it('runInstall executes only once', function () {
 it('onPackageEvent calls getComposer and getIO', function () {
     $packageEvent = mock(PackageEvent::class);
 
-    $this->config->shouldReceive('get')
+    $this->config
+        ->shouldReceive('get')
         ->with('bin-dir')
         ->andReturn('vendor/bin');
 
-    $this->composer->shouldReceive('getConfig')
-        ->andReturn($this->config);
+    $this->composer->shouldReceive('getConfig')->andReturn($this->config);
 
-    $packageEvent->shouldReceive('getComposer')
+    $packageEvent
+        ->shouldReceive('getComposer')
         ->once()
         ->andReturn($this->composer);
 
-    $packageEvent->shouldReceive('getIO')
+    $packageEvent
+        ->shouldReceive('getIO')
         ->once()
         ->andReturn($this->io);
 
@@ -488,7 +522,7 @@ it('detectPlatform throws RuntimeException for unsupported OS', function () {
 });
 
 it('getLatestVersion throws RuntimeException when HTTP request fails', function () {
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         protected function fetchUrl(string $url): string|false
         {
             return false;
@@ -505,7 +539,7 @@ it('getLatestVersion throws RuntimeException when HTTP request fails', function 
 });
 
 it('getLatestVersion throws RuntimeException when response has no tag_name', function () {
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         protected function fetchUrl(string $url): string|false
         {
             return json_encode(['name' => 'some-release']);
@@ -522,7 +556,7 @@ it('getLatestVersion throws RuntimeException when response has no tag_name', fun
 });
 
 it('getLatestVersion returns version string without leading v', function () {
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         protected function fetchUrl(string $url): string|false
         {
             return json_encode(['tag_name' => 'v1.77.0']);
@@ -608,11 +642,12 @@ it('downloadNativeSass writes already installed message when sass is present', f
     $event->shouldReceive('getComposer')->andReturn($composer);
     $event->shouldReceive('getIO')->andReturn($io);
 
-    $io->shouldReceive('write')
+    $io
+        ->shouldReceive('write')
         ->once()
         ->with(Mockery::pattern('/already installed/'));
 
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         protected function getPackagePath(): string
         {
             return '';
@@ -677,7 +712,7 @@ it('downloadNativeSass on Windows extracts zip and flattens dart-sass directory'
 
     $io->shouldReceive('write')->zeroOrMoreTimes();
 
-    $plugin = new class ($baseDir, $zipContent) extends Plugin {
+    $plugin = new class($baseDir, $zipContent) extends Plugin {
         public function __construct(
             private readonly string $fakeBaseDir,
             private readonly string $fakeZipContent,
@@ -735,7 +770,7 @@ it('downloadNativeSass on Windows extracts zip and flattens dart-sass directory'
     $files = [];
     if (is_dir($targetDir)) {
         $it = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($targetDir, FilesystemIterator::SKIP_DOTS)
+            new RecursiveDirectoryIterator($targetDir, FilesystemIterator::SKIP_DOTS),
         );
 
         foreach ($it as $f) {
@@ -743,9 +778,13 @@ it('downloadNativeSass on Windows extracts zip and flattens dart-sass directory'
         }
     }
 
-    expect($caughtError)->toBeNull()
-        ->and($files)->not->toBeEmpty()
-        ->and($files[0])->toContain('sass');
+    expect($caughtError)
+        ->toBeNull()
+        ->and($files)
+        ->not
+        ->toBeEmpty()
+        ->and($files[0])
+        ->toContain('sass');
 
     // cleanup
     foreach ($files as $file) {
@@ -824,7 +863,7 @@ it('flattenExtractedSass throws when rmdir fails after moving files', function (
 });
 
 it('downloadFile throws when HTTP download fails', function () {
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         protected function fetchFileContent(string $url): string|false
         {
             return false;
@@ -850,8 +889,10 @@ it('extractArchive on Unix runs tar and succeeds', function () {
     $process->shouldReceive('run')->once();
     $process->shouldReceive('isSuccessful')->once()->andReturn(true);
 
-    $plugin = new class ($process) extends Plugin {
-        public function __construct(private readonly Process $fakeProcess) {}
+    $plugin = new class($process) extends Plugin {
+        public function __construct(
+            private readonly Process $fakeProcess,
+        ) {}
 
         protected function getOsFamily(): string
         {
@@ -883,8 +924,10 @@ it('extractArchive on Unix throws when tar fails', function () {
     $process->shouldReceive('isSuccessful')->once()->andReturn(false);
     $process->shouldReceive('getErrorOutput')->once()->andReturn('tar: file not found');
 
-    $plugin = new class ($process) extends Plugin {
-        public function __construct(private readonly Process $fakeProcess) {}
+    $plugin = new class($process) extends Plugin {
+        public function __construct(
+            private readonly Process $fakeProcess,
+        ) {}
 
         protected function getOsFamily(): string
         {
@@ -1040,7 +1083,7 @@ it('fetchUrl does not add Authorization header when no token is available', func
 });
 
 it('createTarProcess returns a Process configured with tar command', function () {
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         public function exposeCreateTarProcess(string $archivePath, string $targetDir): Process
         {
             return $this->createTarProcess($archivePath, $targetDir);
@@ -1049,8 +1092,7 @@ it('createTarProcess returns a Process configured with tar command', function ()
 
     $process = $plugin->exposeCreateTarProcess('/tmp/sass.tar.gz', '/tmp/target');
 
-    expect($process)->toBeInstanceOf(Process::class)
-        ->and($process->getCommandLine())->toContain('tar');
+    expect($process)->toBeInstanceOf(Process::class)->and($process->getCommandLine())->toContain('tar');
 });
 
 it('getInstalledVersion returns null when .sass-version file does not exist', function () {
@@ -1058,7 +1100,7 @@ it('getInstalledVersion returns null when .sass-version file does not exist', fu
 
     mkdir($dir, 0777, true);
 
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         public function exposeGetInstalledVersion(string $targetDir): ?string
         {
             return $this->getInstalledVersion($targetDir);
@@ -1076,7 +1118,7 @@ it('getInstalledVersion returns version from .sass-version file', function () {
     mkdir($dir, 0777, true);
     file_put_contents($dir . '/.sass-version', '1.88.0');
 
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         public function exposeGetInstalledVersion(string $targetDir): ?string
         {
             return $this->getInstalledVersion($targetDir);
@@ -1095,7 +1137,7 @@ it('getInstalledVersion returns null when .sass-version file is empty', function
     mkdir($dir, 0777, true);
     file_put_contents($dir . '/.sass-version', '');
 
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         public function exposeGetInstalledVersion(string $targetDir): ?string
         {
             return $this->getInstalledVersion($targetDir);
@@ -1113,7 +1155,7 @@ it('saveInstalledVersion writes version to .sass-version file', function () {
 
     mkdir($dir, 0777, true);
 
-    $plugin = new class () extends Plugin {
+    $plugin = new class() extends Plugin {
         public function exposeSaveInstalledVersion(string $targetDir, string $version): void
         {
             $this->saveInstalledVersion($targetDir, $version);
@@ -1160,7 +1202,7 @@ it('downloadNativeSass removes old files and updates when version differs', func
 
     $io->shouldReceive('write')->zeroOrMoreTimes();
 
-    $plugin = new class ($baseDir, $zipContent) extends Plugin {
+    $plugin = new class($baseDir, $zipContent) extends Plugin {
         public function __construct(
             private readonly string $fakeBaseDir,
             private readonly string $fakeZipContent,
@@ -1215,8 +1257,10 @@ it('downloadNativeSass removes old files and updates when version differs', func
 
     $plugin->onScriptEvent($event);
 
-    expect(file_get_contents($targetDir . '/.sass-version'))->toBe('1.99.0')
-        ->and(file_exists($targetDir . '/sass.bat'))->toBeFalse();
+    expect(file_get_contents($targetDir . '/.sass-version'))
+        ->toBe('1.99.0')
+        ->and(file_exists($targetDir . '/sass.bat'))
+        ->toBeFalse();
 
     // cleanup
     $cleanup = function ($path) use (&$cleanup) {

@@ -52,7 +52,7 @@ trait HandlesSourceMaps
             return self::withSourceMapComment(
                 $css,
                 'data:application/json;base64,' . base64_encode($map),
-                $compressed
+                $compressed,
             );
         }
 
@@ -91,7 +91,7 @@ trait HandlesSourceMaps
         $base = (string) preg_replace(
             '/\.(?:s[ac]ss|css)$/i',
             '',
-            basename(str_replace('\\', '/', $name))
+            basename(str_replace('\\', '/', $name)),
         );
 
         return rtrim($normalized, '/') . '/' . ($base === '' ? 'style' : $base) . '.css.map';

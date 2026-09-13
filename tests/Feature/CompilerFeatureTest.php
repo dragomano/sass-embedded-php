@@ -45,9 +45,13 @@ describe('compilation mode matrix', function () {
         $decodedMap = $encodedMap !== null ? base64_decode($encodedMap, true) : false;
         $mapContent = $decodedMap !== false ? json_decode($decodedMap, true) : null;
 
-        expect($encodedMap)->not()->toBeNull()
-            ->and($mapContent)->toBeArray()
-            ->and($mapContent)->toMatchArray([
+        expect($encodedMap)
+            ->not()
+            ->toBeNull()
+            ->and($mapContent)
+            ->toBeArray()
+            ->and($mapContent)
+            ->toMatchArray([
                 'version'        => 3,
                 'sourceRoot'     => '',
                 'sources'        => ['file:///virtual/input.scss'],
@@ -61,7 +65,7 @@ describe('compilation mode matrix', function () {
 function compilerModeVariations(): array
 {
     $variations = [];
-    $styles = [null, 'expanded', 'compressed'];
+    $styles     = [null, 'expanded', 'compressed'];
 
     foreach ([false, true] as $withSourceMap) {
         foreach ($styles as $style) {
@@ -80,16 +84,16 @@ function compilerModeVariations(): array
 function compilerModeFixture(): string
 {
     return <<<'SCSS'
-    $color: red;
+        $color: red;
 
-    .box {
-      color: $color;
+        .box {
+          color: $color;
 
-      .child {
-        color: rgba(255, 255, 0, 0.8);
-      }
-    }
-    SCSS;
+          .child {
+            color: rgba(255, 255, 0, 0.8);
+          }
+        }
+        SCSS;
 }
 
 function expectedCssBodyForVariation(array $variation): string
@@ -101,13 +105,13 @@ function expectedCssBodyForVariation(array $variation): string
     }
 
     return /** @lang text */ <<<'CSS'
-    .box {
-      color: red;
-    }
-    .box .child {
-      color: rgba(255, 255, 0, 0.8);
-    }
-    CSS;
+        .box {
+          color: red;
+        }
+        .box .child {
+          color: rgba(255, 255, 0, 0.8);
+        }
+        CSS;
 }
 
 function expectedMappingsForStyle(?string $style): string

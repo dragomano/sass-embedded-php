@@ -117,10 +117,9 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         };
 
         $arch = match ($this->getMachine()) {
-            'aarch64',
-            'arm64'  => 'arm64',
-            'armv7l' => 'arm',
-            default  => 'x64',
+            'aarch64', 'arm64' => 'arm64',
+            'armv7l'           => 'arm',
+            default            => 'x64',
         };
 
         return $os . '-' . $arch;
@@ -210,7 +209,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         if ($this->isNativeSassInstalled($targetDir) && $installedVersion === $version) {
             $io->write(sprintf(
                 '<info>[%s]</info> Native Dart Sass already installed.',
-                self::PACKAGE_NAME
+                self::PACKAGE_NAME,
             ));
 
             return;
@@ -230,7 +229,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             '<info>[%s]</info> Downloading Dart Sass %s for %s...',
             self::PACKAGE_NAME,
             $version,
-            $platform
+            $platform,
         ));
 
         if (! is_dir($targetDir)) {
@@ -242,7 +241,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $io->write(sprintf(
             '<info>[%s]</info> Extracting %s...',
             self::PACKAGE_NAME,
-            $filename
+            $filename,
         ));
 
         $this->extractArchive($archivePath, $targetDir);
@@ -255,21 +254,25 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $io->write(sprintf(
             '<info>[%s]</info> Native Dart Sass %s installed successfully.',
             self::PACKAGE_NAME,
-            $version
+            $version,
         ));
     }
 
     protected function isNativeSassInstalled(string $targetDir): bool
     {
         if ($this->getOsFamily() === 'Windows') {
-            return is_file($targetDir . '/sass.bat')
-                && is_file($targetDir . '/src/dart.exe')
-                && is_file($targetDir . '/src/sass.snapshot');
+            return (
+                is_file($targetDir . '/sass.bat')
+                    && is_file($targetDir . '/src/dart.exe')
+                    && is_file($targetDir . '/src/sass.snapshot')
+            );
         }
 
-        return is_file($targetDir . '/sass')
-            && is_file($targetDir . '/src/dart')
-            && is_file($targetDir . '/src/sass.snapshot');
+        return (
+            is_file($targetDir . '/sass')
+                && is_file($targetDir . '/src/dart')
+                && is_file($targetDir . '/src/sass.snapshot')
+        );
     }
 
     protected function downloadFile(string $url, string $targetPath): void
@@ -290,7 +293,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
                 'method' => 'GET',
                 'header' => "User-Agent: sass-embedded-php\r\n",
             ],
-            'ssl' => [
+            'ssl'  => [
                 'verify_peer'      => true,
                 'verify_peer_name' => true,
             ],

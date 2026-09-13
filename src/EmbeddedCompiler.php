@@ -219,7 +219,7 @@ final class EmbeddedCompiler implements CompilerInterface
                 $error = self::fields($outbound[1][0]);
 
                 throw new ProtocolException(
-                    $error[3][0] ?? 'The Dart Sass embedded compiler rejected the request.'
+                    $error[3][0] ?? 'The Dart Sass embedded compiler rejected the request.',
                 );
             }
 
@@ -231,13 +231,13 @@ final class EmbeddedCompiler implements CompilerInterface
 
             if (! isset($outbound[2][0])) {
                 throw new ProtocolException(
-                    'The Dart Sass embedded compiler sent an unsupported message.'
+                    'The Dart Sass embedded compiler sent an unsupported message.',
                 );
             }
 
             if ($responseId !== $id) {
                 throw new ProtocolException(
-                    'The Dart Sass embedded compiler returned a response for an unexpected compilation.'
+                    'The Dart Sass embedded compiler returned a response for an unexpected compilation.',
                 );
             }
 
@@ -251,7 +251,7 @@ final class EmbeddedCompiler implements CompilerInterface
                     $success[2][0] ?? '',
                     $options->sourceMapPath,
                     $options->style === 'compressed',
-                    $name
+                    $name,
                 );
             }
 
@@ -270,7 +270,7 @@ final class EmbeddedCompiler implements CompilerInterface
             $event[3][0] ?? '',
             $event[6][0] ?? '',
             $event[7][0] ?? null,
-            $event[5][0] ?? ''
+            $event[5][0] ?? '',
         );
 
         $this->logs[] = $logEvent;
@@ -366,7 +366,7 @@ final class EmbeddedCompiler implements CompilerInterface
             $this->pipes,
             null,
             null,
-            ['bypass_shell' => true]
+            ['bypass_shell' => true],
         );
 
         if (! is_resource($this->process)) {
@@ -399,13 +399,13 @@ final class EmbeddedCompiler implements CompilerInterface
             $error = self::fields($outbound[1][0]);
 
             throw new ProtocolException(
-                $error[3][0] ?? 'The Dart Sass embedded compiler rejected the version request.'
+                $error[3][0] ?? 'The Dart Sass embedded compiler rejected the version request.',
             );
         }
 
         if (! isset($outbound[8][0])) {
             throw new ProtocolException(
-                'The Dart Sass embedded compiler did not respond to the version request.'
+                'The Dart Sass embedded compiler did not respond to the version request.',
             );
         }
 
@@ -413,7 +413,7 @@ final class EmbeddedCompiler implements CompilerInterface
 
         if ($version === '') {
             throw new ProtocolException(
-                'The Dart Sass embedded compiler did not report its protocol version.'
+                'The Dart Sass embedded compiler did not report its protocol version.',
             );
         }
 
@@ -422,8 +422,8 @@ final class EmbeddedCompiler implements CompilerInterface
                 sprintf(
                     'Unsupported Sass embedded protocol version %s: this package speaks %d.x. Install a matching Dart Sass release.',
                     $version,
-                    self::PROTOCOL_MAJOR
-                )
+                    self::PROTOCOL_MAJOR,
+                ),
             );
         }
     }
@@ -437,9 +437,11 @@ final class EmbeddedCompiler implements CompilerInterface
 
     private static function command(string $root, string $osFamily): array
     {
-        return $osFamily === 'Windows'
-            ? [$root . '/bin/src/dart.exe', $root . '/bin/src/sass.snapshot', '--embedded']
-            : [$root . '/bin/sass', '--embedded'];
+        return (
+            $osFamily === 'Windows'
+                ? [$root . '/bin/src/dart.exe', $root . '/bin/src/sass.snapshot', '--embedded']
+                : [$root . '/bin/sass', '--embedded']
+        );
     }
 
     private function write(string $data, float $deadline): void
@@ -447,7 +449,7 @@ final class EmbeddedCompiler implements CompilerInterface
         while ($data !== '') {
             if ($this->ownsProcess && ! $this->processIsRunning()) {
                 throw new TransportException(
-                    $this->diagnostic('The Dart Sass embedded compiler stopped unexpectedly before writing.')
+                    $this->diagnostic('The Dart Sass embedded compiler stopped unexpectedly before writing.'),
                 );
             }
 
@@ -457,7 +459,7 @@ final class EmbeddedCompiler implements CompilerInterface
 
             if ($written === false || $written === 0) {
                 throw new TransportException(
-                    $this->diagnostic('Unable to write to the Dart Sass embedded compiler.')
+                    $this->diagnostic('Unable to write to the Dart Sass embedded compiler.'),
                 );
             }
 
@@ -477,7 +479,7 @@ final class EmbeddedCompiler implements CompilerInterface
 
         if ($length > self::MAX_PACKET_LENGTH) {
             throw new ProtocolException(
-                sprintf('The Dart Sass embedded compiler sent an oversized packet (%d bytes).', $length)
+                sprintf('The Dart Sass embedded compiler sent an oversized packet (%d bytes).', $length),
             );
         }
 
@@ -541,7 +543,7 @@ final class EmbeddedCompiler implements CompilerInterface
 
         if ($chunk === '' || $chunk === false) {
             throw new TransportException(
-                $this->diagnostic('The Dart Sass embedded compiler stopped unexpectedly.')
+                $this->diagnostic('The Dart Sass embedded compiler stopped unexpectedly.'),
             );
         }
 
@@ -576,7 +578,9 @@ final class EmbeddedCompiler implements CompilerInterface
             }
 
             if ($ready === false) {
-                throw new TransportException($this->diagnostic('Unable to communicate with the Dart Sass embedded compiler.'));
+                throw new TransportException($this->diagnostic(
+                    'Unable to communicate with the Dart Sass embedded compiler.',
+                ));
             }
 
             if ($ready === 0) {
@@ -741,8 +745,8 @@ final class EmbeddedCompiler implements CompilerInterface
                     sprintf(
                         'Unsupported Dart Sass embedded protocol field type %d near %s.',
                         $wireType,
-                        bin2hex(substr($message, max(0, $offset - 8), 16))
-                    )
+                        bin2hex(substr($message, max(0, $offset - 8), 16)),
+                    ),
                 );
             }
 
@@ -760,7 +764,7 @@ final class EmbeddedCompiler implements CompilerInterface
 
     private static function assertAvailable(int $length, int $offset, int $needed): void
     {
-        if ($needed < 0 || $offset > $length - $needed) {
+        if ($needed < 0 || $offset > ($length - $needed)) {
             throw new ProtocolException('The Dart Sass embedded compiler sent a truncated protobuf field.');
         }
     }

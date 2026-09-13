@@ -7,16 +7,26 @@ use Bugo\Sass\Options;
 it('has null properties when constructed with no arguments', function () {
     $options = new Options();
 
-    expect($options->syntax)->toBeNull()
-        ->and($options->style)->toBeNull()
-        ->and($options->includeSources)->toBeNull()
-        ->and($options->loadPaths)->toBeNull()
-        ->and($options->quietDeps)->toBeNull()
-        ->and($options->silenceDeprecations)->toBeNull()
-        ->and($options->verbose)->toBeNull()
-        ->and($options->sourceMapPath)->toBeNull()
-        ->and($options->url)->toBeNull()
-        ->and($options->sourceFile)->toBeNull();
+    expect($options->syntax)
+        ->toBeNull()
+        ->and($options->style)
+        ->toBeNull()
+        ->and($options->includeSources)
+        ->toBeNull()
+        ->and($options->loadPaths)
+        ->toBeNull()
+        ->and($options->quietDeps)
+        ->toBeNull()
+        ->and($options->silenceDeprecations)
+        ->toBeNull()
+        ->and($options->verbose)
+        ->toBeNull()
+        ->and($options->sourceMapPath)
+        ->toBeNull()
+        ->and($options->url)
+        ->toBeNull()
+        ->and($options->sourceFile)
+        ->toBeNull();
 });
 
 it('stores syntax via constructor', function () {
@@ -75,16 +85,26 @@ it('stores all options via constructor', function () {
         sourceFile: 'style.scss',
     );
 
-    expect($options->syntax)->toBe('scss')
-        ->and($options->style)->toBe('compressed')
-        ->and($options->includeSources)->toBeFalse()
-        ->and($options->loadPaths)->toBe(['/vendor/sass'])
-        ->and($options->quietDeps)->toBeTrue()
-        ->and($options->silenceDeprecations)->toBe(['import'])
-        ->and($options->verbose)->toBeFalse()
-        ->and($options->sourceMapPath)->toBe('/out/style.map')
-        ->and($options->url)->toBe('file:///src/style.scss')
-        ->and($options->sourceFile)->toBe('style.scss');
+    expect($options->syntax)
+        ->toBe('scss')
+        ->and($options->style)
+        ->toBe('compressed')
+        ->and($options->includeSources)
+        ->toBeFalse()
+        ->and($options->loadPaths)
+        ->toBe(['/vendor/sass'])
+        ->and($options->quietDeps)
+        ->toBeTrue()
+        ->and($options->silenceDeprecations)
+        ->toBe(['import'])
+        ->and($options->verbose)
+        ->toBeFalse()
+        ->and($options->sourceMapPath)
+        ->toBe('/out/style.map')
+        ->and($options->url)
+        ->toBe('file:///src/style.scss')
+        ->and($options->sourceFile)
+        ->toBe('style.scss');
 });
 
 it('returns itself when no overrides are provided', function () {
@@ -117,14 +137,24 @@ it('inherits null values and preserves explicit false and empty arrays', functio
         url: 'file:///override.scss',
     ));
 
-    expect($merged->syntax)->toBe('scss')
-        ->and($merged->style)->toBe('compressed')
-        ->and($merged->includeSources)->toBeFalse()
-        ->and($merged->loadPaths)->toBe([])
-        ->and($merged->quietDeps)->toBeFalse()
-        ->and($merged->silenceDeprecations)->toBe([])
-        ->and($merged->verbose)->toBeFalse()
-        ->and($merged->sourceMapPath)->toBe('inline')
-        ->and($merged->url)->toBe('file:///override.scss')
-        ->and($merged->sourceFile)->toBe('default.scss');
+    expect($merged->syntax)
+        ->toBe('scss')
+        ->and($merged->style)
+        ->toBe('compressed')
+        ->and($merged->includeSources)
+        ->toBeFalse()
+        ->and($merged->loadPaths)
+        ->toBe([])
+        ->and($merged->quietDeps)
+        ->toBeFalse()
+        ->and($merged->silenceDeprecations)
+        ->toBe([])
+        ->and($merged->verbose)
+        ->toBeFalse()
+        ->and($merged->sourceMapPath)
+        ->toBe('inline')
+        ->and($merged->url)
+        ->toBe('file:///override.scss')
+        ->and($merged->sourceFile)
+        ->toBe('default.scss');
 });

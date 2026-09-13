@@ -27,11 +27,12 @@ it('runs the cold and warm benchmark matrix', function () {
 
     expect($process->isSuccessful())
         ->toBeTrue($process->getErrorOutput() ?: $process->getOutput())
-        ->and($process->getOutput())->toContain(
+        ->and($process->getOutput())
+        ->toContain(
             '| small | string | cold | CLI Compiler |',
             '| small | string | cold | EmbeddedCompiler |',
             '| small | string | warm | EmbeddedCompiler |',
-            '| small | string | warm | scssphp/scssphp |'
+            '| small | string | warm | scssphp/scssphp |',
         );
 });
 

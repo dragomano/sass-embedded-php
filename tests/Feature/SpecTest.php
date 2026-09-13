@@ -54,8 +54,10 @@ if (getenv('RUN_SASS_SPEC') && is_dir($specDir)) {
                     }
 
                     expect($failures)->toBeEmpty(
-                        count($failures) . ' failed:'
-                        . "\n\n" . implode("\n\n---\n\n", $failures),
+                        count($failures)
+                            . ' failed:'
+                            . "\n\n"
+                            . implode("\n\n---\n\n", $failures),
                     );
                 });
             }
@@ -96,7 +98,7 @@ function collectSpecFilesGrouped(string $specDir): array
     $batchSize = 100;
 
     foreach ($allFiles as $index => $file) {
-        $batchIndex = intdiv($index, $batchSize);
+        $batchIndex             = intdiv($index, $batchSize);
         $batches[$batchIndex][] = $file;
     }
 
@@ -109,7 +111,7 @@ function collectSpecFilesGrouped(string $specDir): array
         $firstDir = explode('/', $first)[0];
         $lastDir  = explode('/', $last)[0];
 
-        $rangeStart = $batchIndex * $batchSize + 1;
+        $rangeStart = ($batchIndex * $batchSize) + 1;
         $rangeEnd   = $rangeStart + count($batchFiles) - 1;
 
         if ($firstDir === $lastDir) {
@@ -272,8 +274,12 @@ function isSpecInputFileName(string $relativePath): bool
  * itself is passed as a load path so spec-root-relative imports work too.
  * @throws RandomException
  */
-function compileWithSupportFiles(CompilerInterface $compiler, string $inputRelPath, string $inputSource, array $supportFiles): string
-{
+function compileWithSupportFiles(
+    CompilerInterface $compiler,
+    string $inputRelPath,
+    string $inputSource,
+    array $supportFiles,
+): string {
     $tempDir = createTempSpecDir();
 
     try {
@@ -366,9 +372,9 @@ function parseHrxEntries(string $content): array
             $path = trim(substr($line, 5));
 
             if ($path === '' || $path === 'README.md') {
-                $currentPath  = null;
+                $currentPath = null;
             } else {
-                $currentPath  = $path;
+                $currentPath = $path;
             }
 
             $currentLines = [];

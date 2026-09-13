@@ -37,11 +37,18 @@ it('rejects overflowing and overlong frame varints', function () {
 });
 
 it('stops after the configured number of transport retries', function () {
-    $process = proc_open([PHP_BINARY, '-r', 'fread(STDIN, 8192);'], [
-        0 => ['pipe', 'r'],
-        1 => ['pipe', 'w'],
-        2 => ['pipe', 'w'],
-    ], $pipes, null, null, ['bypass_shell' => true]);
+    $process = proc_open(
+        [PHP_BINARY, '-r', 'fread(STDIN, 8192);'],
+        [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ],
+        $pipes,
+        null,
+        null,
+        ['bypass_shell' => true],
+    );
 
     foreach ($pipes as $pipe) {
         stream_set_blocking($pipe, false);
@@ -60,11 +67,18 @@ it('stops after the configured number of transport retries', function () {
 });
 
 it('detects an owned process that died immediately before writing', function () {
-    $process = proc_open([PHP_BINARY, '-r', ''], [
-        0 => ['pipe', 'r'],
-        1 => ['pipe', 'w'],
-        2 => ['pipe', 'w'],
-    ], $pipes, null, null, ['bypass_shell' => true]);
+    $process = proc_open(
+        [PHP_BINARY, '-r', ''],
+        [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ],
+        $pipes,
+        null,
+        null,
+        ['bypass_shell' => true],
+    );
 
     foreach ($pipes as $pipe) {
         stream_set_blocking($pipe, false);
@@ -109,11 +123,18 @@ it('drains closed, invalid, and exhausted streams safely', function () {
 
     expect(invokeCoverageStatic('drainAvailableStream', $closed))->toBeNull();
 
-    $invalidProcess = proc_open([PHP_BINARY, '-r', 'usleep(100000);'], [
-        0 => ['pipe', 'r'],
-        1 => ['pipe', 'w'],
-        2 => ['pipe', 'w'],
-    ], $invalidPipes, null, null, ['bypass_shell' => true]);
+    $invalidProcess = proc_open(
+        [PHP_BINARY, '-r', 'usleep(100000);'],
+        [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ],
+        $invalidPipes,
+        null,
+        null,
+        ['bypass_shell' => true],
+    );
 
     expect(invokeCoverageStatic('drainAvailableStream', $invalidProcess))->toBeNull();
 
@@ -124,11 +145,18 @@ it('drains closed, invalid, and exhausted streams safely', function () {
     proc_terminate($invalidProcess);
     proc_close($invalidProcess);
 
-    $process = proc_open([PHP_BINARY, '-r', ''], [
-        0 => ['pipe', 'r'],
-        1 => ['pipe', 'w'],
-        2 => ['pipe', 'w'],
-    ], $pipes, null, null, ['bypass_shell' => true]);
+    $process = proc_open(
+        [PHP_BINARY, '-r', ''],
+        [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ],
+        $pipes,
+        null,
+        null,
+        ['bypass_shell' => true],
+    );
 
     fclose($pipes[0]);
     stream_set_blocking($pipes[1], false);
@@ -164,8 +192,8 @@ function coverageVarint(int $value): string
     $encoded = '';
 
     do {
-        $byte = $value & 0x7f;
-        $value >>= 7;
+        $byte    = $value & 0x7f;
+        $value   >>= 7;
         $encoded .= chr($value === 0 ? $byte : $byte | 0x80);
     } while ($value !== 0);
 

@@ -16,7 +16,9 @@ class Compiler implements CompilerInterface
      */
     private const EMBEDDED_SOURCE_MAP = '~\s*/\*# sourceMappingURL=data:application/json;charset=utf-8,(\S+) \*/~';
 
-    public function __construct(protected Options $options = new Options()) {}
+    public function __construct(
+        protected Options $options = new Options(),
+    ) {}
 
     public function setOptions(Options $options): self
     {
@@ -95,7 +97,7 @@ class Compiler implements CompilerInterface
     {
         return array_filter(
             (array) $this->options->withOverrides($options),
-            static fn($value): bool => $value !== null
+            static fn($value): bool => $value !== null,
         );
     }
 
@@ -117,7 +119,7 @@ class Compiler implements CompilerInterface
         return $this->applySourceMap(
             $out,
             $options,
-            $options['url'] ?? $options['sourceFile'] ?? ''
+            $options['url'] ?? $options['sourceFile'] ?? '',
         );
     }
 

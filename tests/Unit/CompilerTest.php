@@ -13,8 +13,10 @@ beforeEach(function () {
 it('stores options and merges method overrides', function () {
     $options = new Options(style: 'expanded', includeSources: true);
 
-    expect($this->compiler->setOptions($options))->toBe($this->compiler)
-        ->and($this->compiler->getOptions())->toBe($options);
+    expect($this->compiler->setOptions($options))
+        ->toBe($this->compiler)
+        ->and($this->compiler->getOptions())
+        ->toBe($options);
 
     $resolved = (fn() => $this->resolveOptions(new Options(
         style: 'compressed',
@@ -30,17 +32,16 @@ it('stores options and merges method overrides', function () {
 });
 
 it('returns empty css for blank and comment-only input', function () {
-    expect($this->compiler->compileString(''))->toBe('')
-        ->and($this->compiler->compileString('// comment'))->toBe('');
+    expect($this->compiler->compileString(''))->toBe('')->and($this->compiler->compileString('// comment'))->toBe('');
 });
 
 it('compiles indented syntax and rejects invalid syntax', function () {
     $sass = <<<'SASS'
-    $color: red
+        $color: red
 
-    .box
-      color: $color
-    SASS;
+        .box
+          color: $color
+        SASS;
 
     expect($this->compiler->compileString($sass, new Options(syntax: 'indented')))
         ->toBe(".box {\n  color: red;\n}")
@@ -75,7 +76,7 @@ it('passes merged options to native file compilation', function () {
 
     file_put_contents($input, 'a { b: c }');
 
-    $compiler = new class (new Options(includeSources: true)) extends Compiler {
+    $compiler = new class(new Options(includeSources: true)) extends Compiler {
         protected function compileFileNative(string $filePath, array $options): string
         {
             return json_encode(['file' => $filePath, 'options' => $options]);
@@ -85,8 +86,10 @@ it('passes merged options to native file compilation', function () {
     try {
         $data = json_decode($compiler->compileFile($input, new Options(style: 'compressed')), true);
 
-        expect($data['file'])->toBe($input)
-            ->and($data['options'])->toBe([
+        expect($data['file'])
+            ->toBe($input)
+            ->and($data['options'])
+            ->toBe([
                 'style'          => 'compressed',
                 'includeSources' => true,
             ]);
@@ -103,8 +106,10 @@ it('writes only newer source files', function () {
     touch($output, time() - 100);
 
     try {
-        expect($this->compiler->compileFileAndSave($input, $output))->toBeTrue()
-            ->and(file_get_contents($output))->toContain('.box');
+        expect($this->compiler->compileFileAndSave($input, $output))
+            ->toBeTrue()
+            ->and(file_get_contents($output))
+            ->toContain('.box');
 
         touch($output, time() + 100);
 
@@ -123,8 +128,11 @@ it('handles source map modes and url precedence', function () {
     file_put_contents($input, '.box { color: red; }');
 
     try {
-        expect($this->compiler->compileFile($input))->not->toContain('sourceMappingURL')
-            ->and($this->compiler->getSourceMap())->toBeNull();
+        expect($this->compiler->compileFile($input))
+            ->not
+            ->toContain('sourceMappingURL')
+            ->and($this->compiler->getSourceMap())
+            ->toBeNull();
 
         $inline = $this->compiler->compileString('.box { color: red; }', new Options(
             includeSources: true,
@@ -134,19 +142,26 @@ it('handles source map modes and url precedence', function () {
         ));
         $map = json_decode((string) $this->compiler->getSourceMap(), true);
 
-        expect($inline)->toContain('sourceMappingURL=data:application/json;base64,')
-            ->and($map['sources'])->toBe(['file:///virtual/input.scss'])
-            ->and($map)->toHaveKey('sourcesContent');
+        expect($inline)
+            ->toContain('sourceMappingURL=data:application/json;base64,')
+            ->and($map['sources'])
+            ->toBe(['file:///virtual/input.scss'])
+            ->and($map)
+            ->toHaveKey('sourcesContent');
 
         $explicit = $this->compiler->compileFile($input, new Options(sourceMapPath: $dir . '/custom.map'));
 
-        expect($explicit)->toEndWith("\n\n/*# sourceMappingURL=custom.map */")
-            ->and(json_decode((string) file_get_contents($dir . '/custom.map'), true))->toHaveKey('mappings');
+        expect($explicit)
+            ->toEndWith("\n\n/*# sourceMappingURL=custom.map */")
+            ->and(json_decode((string) file_get_contents($dir . '/custom.map'), true))
+            ->toHaveKey('mappings');
 
         $intoDir = $this->compiler->compileFile($input, new Options(sourceMapPath: $dir));
 
-        expect($intoDir)->toEndWith("\n\n/*# sourceMappingURL=app.css.map */")
-            ->and(is_file($dir . '/app.css.map'))->toBeTrue();
+        expect($intoDir)
+            ->toEndWith("\n\n/*# sourceMappingURL=app.css.map */")
+            ->and(is_file($dir . '/app.css.map'))
+            ->toBeTrue();
 
         $remote = $this->compiler->compileString('.box { color: red; }', new Options(
             style: 'compressed',
@@ -159,8 +174,9 @@ it('handles source map modes and url precedence', function () {
 
         expect(fn() => $this->compiler->compileFile(
             $input,
-            new Options(sourceMapPath: $dir . '/absent/app.css.map')
-        ))->toThrow(Exception::class, 'Unable to write the source map to');
+            new Options(sourceMapPath: $dir . '/absent/app.css.map'),
+        ))
+            ->toThrow(Exception::class, 'Unable to write the source map to');
     } finally {
         restore_error_handler();
 
@@ -173,19 +189,21 @@ it('handles source map modes and url precedence', function () {
 });
 
 it('leaves css unchanged when the cli returns no embedded map', function () {
-    $compiler = new class () extends Compiler {
+    $compiler = new class() extends Compiler {
         public function exposeApplySourceMap(string $css, array $options): string
         {
             return $this->applySourceMap($css, $options, 'app.scss');
         }
     };
 
-    expect($compiler->exposeApplySourceMap('a{b:c}', ['sourceMapPath' => 'inline']))->toBe('a{b:c}')
-        ->and($compiler->getSourceMap())->toBeNull();
+    expect($compiler->exposeApplySourceMap('a{b:c}', ['sourceMapPath' => 'inline']))
+        ->toBe('a{b:c}')
+        ->and($compiler->getSourceMap())
+        ->toBeNull();
 });
 
 it('builds every supported cli argument', function () {
-    $compiler = new class () extends Compiler {
+    $compiler = new class() extends Compiler {
         public function exposeBuildSassArgs(array $options): array
         {
             return $this->buildSassArgs($options);
@@ -213,7 +231,7 @@ it('builds every supported cli argument', function () {
 });
 
 it('builds sass commands for supported platforms', function () {
-    $compiler = new class () extends Compiler {
+    $compiler = new class() extends Compiler {
         public bool $windows = false;
 
         protected function isWindows(): bool

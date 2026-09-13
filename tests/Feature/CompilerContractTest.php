@@ -24,9 +24,12 @@ it('implements the shared options contract', function (string $compilerClass) {
     $options  = new Options(style: 'compressed');
 
     try {
-        expect($compiler)->toBeInstanceOf(CompilerInterface::class)
-            ->and($compiler->setOptions($options))->toBe($compiler)
-            ->and($compiler->getOptions())->toBe($options);
+        expect($compiler)
+            ->toBeInstanceOf(CompilerInterface::class)
+            ->and($compiler->setOptions($options))
+            ->toBe($compiler)
+            ->and($compiler->getOptions())
+            ->toBe($options);
     } finally {
         closeContractCompiler($compiler);
     }
@@ -56,10 +59,14 @@ it('merges method options with instance defaults', function (string $compilerCla
 
         $map = json_decode((string) $compiler->getSourceMap(), true);
 
-        expect($css)->toStartWith('a{b:c}')
-            ->and($css)->toContain('sourceMappingURL=data:application/json;base64,')
-            ->and($map['sources'])->toBe(['file:///virtual/override.scss'])
-            ->and($map)->toHaveKey('sourcesContent');
+        expect($css)
+            ->toStartWith('a{b:c}')
+            ->and($css)
+            ->toContain('sourceMappingURL=data:application/json;base64,')
+            ->and($map['sources'])
+            ->toBe(['file:///virtual/override.scss'])
+            ->and($map)
+            ->toHaveKey('sourcesContent');
     } finally {
         closeContractCompiler($compiler);
     }
@@ -69,8 +76,10 @@ it('returns empty css for blank and comment-only input', function (string $compi
     $compiler = new $compilerClass();
 
     try {
-        expect($compiler->compileString(" \n\t "))->toBe('')
-            ->and($compiler->compileString('// comment only'))->toBe('');
+        expect($compiler->compileString(" \n\t "))
+            ->toBe('')
+            ->and($compiler->compileString('// comment only'))
+            ->toBe('');
     } finally {
         closeContractCompiler($compiler);
     }
@@ -80,14 +89,17 @@ it('compiles expanded, compressed, and indented string input', function (string 
     $compiler = new $compilerClass();
 
     try {
-        expect($compiler->compileString('a { b: c }'))->toBe("a {\n  b: c;\n}")
-            ->and($compiler->compileString('a { b: c }', new Options(style: 'compressed')))->toBe('a{b:c}')
+        expect($compiler->compileString('a { b: c }'))
+            ->toBe("a {\n  b: c;\n}")
+            ->and($compiler->compileString('a { b: c }', new Options(style: 'compressed')))
+            ->toBe('a{b:c}')
             ->and($compiler->compileString(<<<'SASS'
-            $color: red
+                $color: red
 
-            .box
-              color: $color
-            SASS, new Options(syntax: 'indented')))->toBe(".box {\n  color: red;\n}");
+                .box
+                  color: $color
+                SASS, new Options(syntax: 'indented')))
+            ->toBe(".box {\n  color: red;\n}");
     } finally {
         closeContractCompiler($compiler);
     }
@@ -127,8 +139,10 @@ it('saves only when the source file is newer', function (string $compilerClass) 
     touch($output, time() - 10);
 
     try {
-        expect($compiler->compileFileAndSave($input, $output))->toBeTrue()
-            ->and(file_get_contents($output))->toBe("a {\n  b: c;\n}");
+        expect($compiler->compileFileAndSave($input, $output))
+            ->toBeTrue()
+            ->and(file_get_contents($output))
+            ->toBe("a {\n  b: c;\n}");
 
         touch($output, time() + 10);
 
@@ -168,11 +182,16 @@ it('gives url precedence in compatible inline source maps', function (string $co
 
         $map = json_decode((string) $compiler->getSourceMap(), true);
 
-        expect($css)->toContain('sourceMappingURL=data:application/json;base64,')
-            ->and($map)->toBeArray()
-            ->and($map['version'])->toBe(3)
-            ->and($map['sources'])->toBe(['file:///virtual/contract.scss'])
-            ->and($map)->toHaveKey('sourcesContent');
+        expect($css)
+            ->toContain('sourceMappingURL=data:application/json;base64,')
+            ->and($map)
+            ->toBeArray()
+            ->and($map['version'])
+            ->toBe(3)
+            ->and($map['sources'])
+            ->toBe(['file:///virtual/contract.scss'])
+            ->and($map)
+            ->toHaveKey('sourcesContent');
     } finally {
         closeContractCompiler($compiler);
     }

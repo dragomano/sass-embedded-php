@@ -1,0 +1,78 @@
+#:schema vendor/carthage-software/mago/schema.json
+
+version = "1.48.1"
+php-version = "8.2"
+
+[source]
+paths = ["src", "tests"]
+includes = ["vendor"]
+
+[source.glob]
+literal-separator = true
+
+[formatter]
+preset = "psr-12"
+print-width = 120
+tab-width = 4
+use-tabs = false
+end-of-line = "lf"
+single-quote = true
+indent-heredoc = true
+trailing-comma = true
+control-brace-style = "same-line"
+following-clause-on-newline = false
+closure-brace-style = "same-line"
+function-brace-style = "next-line"
+method-brace-style = "next-line"
+classlike-brace-style = "always-next-line"
+inline-empty-control-braces = false
+inline-empty-closure-braces = true
+inline-empty-function-braces = true
+inline-empty-method-braces = true
+inline-empty-constructor-braces = true
+inline-empty-classlike-braces = true
+inline-empty-anonymous-class-braces = true
+method-chain-breaking-style = "next-line"
+first-method-chain-on-new-line = true
+method-chain-semicolon-on-next-line = false
+preserve-breaking-member-access-chain = true
+preserve-breaking-member-access-chain-first-method-on-same-line = false
+preserve-breaking-argument-list = true
+preserve-breaking-array-like = true
+preserve-breaking-parameter-list = true
+preserve-breaking-conditional-expression = true
+preserve-breaking-condition-expression = true
+preserve-breaking-binary-expression = true
+line-before-binary-operator = true
+align-parameters = false
+align-named-arguments = false
+array-table-style-alignment = true
+align-assignment-like = true
+sort-uses = "alpha-ascending"
+separate-use-types = true
+expand-use-groups = true
+null-type-hint = "question"
+parentheses-in-new-expression = true
+space-before-arrow-function-parameter-list-parenthesis = false
+space-before-closure-parameter-list-parenthesis = true
+space-before-closure-use-clause-parenthesis = true
+space-after-cast-unary-prefix-operators = true
+space-after-logical-not-unary-prefix-operator = true
+space-around-concatenation-binary-operator = true
+space-around-assignment-in-declare = false
+space-within-grouping-parenthesis = false
+opening-tag-on-own-line = true
+empty-line-after-opening-tag = true
+empty-line-after-declare = true
+combine-opening-tag-and-declare = false
+empty-line-after-namespace = true
+empty-line-after-use = true
+empty-line-after-symbols = true
+empty-line-between-same-symbols = true
+empty-line-after-class-like-constant = true
+empty-line-after-trait-use = true
+empty-line-after-property = true
+empty-line-after-method = true
+empty-line-before-return = true
+empty-line-before-dangling-comments = true
+separate-class-like-members = true

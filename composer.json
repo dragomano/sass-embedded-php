@@ -24,8 +24,8 @@
   },
   "require-dev": {
     "bugo/scss-benchmark-utils": "dev-main",
+    "carthage-software/mago": "1.48.1",
     "composer/composer": "*",
-    "friendsofphp/php-cs-fixer": "^3.95",
     "mockery/mockery": "^1.6.15",
     "pestphp/pest": "^3.8|^4.7|^5.1",
     "rector/rector": "^2.6",
@@ -47,9 +47,18 @@
       "php scripts/update-spec.php --if-missing"
     ],
     "update-spec": "php scripts/update-spec.php",
-    "fix": "vendor/bin/php-cs-fixer fix",
+    "fix": "@mago:format",
     "check": "vendor/bin/rector process --dry-run --clear-cache",
     "rector": "vendor/bin/rector process",
+    "mago:format": "vendor/bin/mago format",
+    "mago:format-check": "vendor/bin/mago format --check",
+    "mago:lint": "vendor/bin/mago lint",
+    "mago:analyze": "vendor/bin/mago analyze",
+    "mago:check": [
+      "@mago:format-check",
+      "@mago:lint",
+      "@mago:analyze"
+    ],
     "benchmark": "php benchmark.php",
     "test": "vendor/bin/pest --colors=always",
     "test-spec": [

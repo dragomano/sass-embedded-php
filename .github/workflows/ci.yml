@@ -43,7 +43,9 @@ jobs:
         run: composer test
 
       - name: Check code style
-        run: vendor/bin/php-cs-fixer fix --dry-run --diff
+        run: composer mago:format-check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Rector
         run: composer check

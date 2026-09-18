@@ -49,6 +49,11 @@ namespace {
         $process->setInput($input);
         $process->setTimeout(null);
         $process->start();
+
+        while (! $process->isRunning() && ! $process->isTerminated()) {
+            usleep(1_000);
+        }
+
         $input->write('x');
 
         $compiler        = new EmbeddedCompiler(timeout: $timeout);
@@ -117,7 +122,7 @@ namespace {
 
         try {
             file_put_contents($input, 'a { b: c }');
-            touch($output, time() - 1);
+            touch($output, time() - 100);
 
             expect($compiler->compileFileAndSave($input, $output))
                 ->toBeTrue()

@@ -36,7 +36,7 @@ namespace {
         $stderr     = $options['stderr'] ?? '';
         $maxRetries = $options['maxRetries'] ?? 1;
         $script     = sprintf(
-            '$output = base64_decode(%s); $stderr = base64_decode(%s); fread(STDIN, 1); fwrite(STDOUT, $output); fwrite(STDERR, $stderr); fflush(STDOUT); fflush(STDERR); %s',
+            '$output = base64_decode(%s); $stderr = base64_decode(%s); fread(STDIN, 1); fwrite(STDERR, $stderr); fflush(STDERR); fwrite(STDOUT, $output); fflush(STDOUT); %s',
             var_export(base64_encode($output), true),
             var_export(base64_encode($stderr), true),
             $wait ? 'while (true) { usleep(1000000); }' : '',

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Bugo\Sass;
 
 use Closure;
-use ValueError;
+use Symfony\Component\Process\InputStream;
+use Symfony\Component\Process\Process;
+use Throwable;
 
 final class EmbeddedCompiler implements CompilerInterface
 {
@@ -13,21 +15,19 @@ final class EmbeddedCompiler implements CompilerInterface
 
     private const PROTOCOL_MAJOR = 3;
 
-    private const READ_CHUNK_SIZE = 8192;
-
     private const MAX_VARINT_BYTES = 10;
 
     private const MAX_PACKET_LENGTH = 268_435_456;
 
+    private const POLL_INTERVAL_MICROS = 1_000;
+
+    private const STDERR_TAIL_BYTES = 8192;
+
     private const CLOSE_TIMEOUT = 0.5;
 
-    private const TERMINATE_TIMEOUT = 0.25;
+    private ?Process $process = null;
 
-    /** @var resource|null */
-    private $process;
-
-    /** @var array<int, resource> */
-    private array $pipes = [];
+    private ?InputStream $input = null;
 
     private int $nextId = 1;
 
@@ -47,6 +47,7 @@ final class EmbeddedCompiler implements CompilerInterface
     public function __construct(
         private readonly float $timeout = 15.0,
         private Options $options = new Options(),
+        private readonly ?Closure $processFactory = null,
     ) {}
 
     public function __destruct()
@@ -91,8 +92,7 @@ final class EmbeddedCompiler implements CompilerInterface
 
         $options = $this->options->withOverrides($options);
 
-        $url = self::stringUrl($options);
-
+        $url   = self::stringUrl($options);
         $input = self::field(1, $source);
 
         if ($url !== '') {
@@ -135,39 +135,28 @@ final class EmbeddedCompiler implements CompilerInterface
     public function close(): void
     {
         $process = $this->process;
-
-        $pipes = $this->pipes;
+        $input   = $this->input;
 
         $this->process     = null;
-        $this->pipes       = [];
+        $this->input       = null;
         $this->stderr      = '';
         $this->readBuffer  = '';
         $this->ownsProcess = false;
 
-        if (isset($pipes[0]) && is_resource($pipes[0])) {
-            fclose($pipes[0]);
-        }
-
-        if (is_resource($process) && ! self::waitForProcessExit($process, $pipes, self::CLOSE_TIMEOUT)) {
-            @proc_terminate($process);
-
-            self::waitForProcessExit($process, $pipes, self::TERMINATE_TIMEOUT);
-        }
-
-        foreach ([1, 2] as $index) {
-            if (isset($pipes[$index]) && is_resource($pipes[$index])) {
-                fclose($pipes[$index]);
+        if ($input instanceof InputStream) {
+            try {
+                $input->close();
+            } catch (Throwable) {
+                // Already closed, or the process is already gone. Fine either way.
             }
         }
 
-        foreach ($pipes as $pipe) {
-            if (is_resource($pipe)) {
-                fclose($pipe);
-            }
+        if (! $process instanceof Process) {
+            return;
         }
 
-        if (is_resource($process)) {
-            @proc_close($process);
+        if ($process->isRunning()) {
+            $process->stop(self::CLOSE_TIMEOUT);
         }
     }
 
@@ -203,12 +192,10 @@ final class EmbeddedCompiler implements CompilerInterface
         $this->start();
 
         $deadline = $this->deadline();
+        $id       = $this->nextId++;
+        $request  = $input . $this->compileOptions($options);
 
-        $id = $this->nextId++;
-
-        $request = $input . $this->compileOptions($options);
-
-        $this->send($id, self::field(2, $request), $deadline);
+        $this->send($id, self::field(2, $request));
 
         while (true) {
             [$responseId, $message] = $this->readMessage($deadline);
@@ -300,8 +287,7 @@ final class EmbeddedCompiler implements CompilerInterface
         }
 
         $segments = explode('/', ltrim($path, '/'));
-
-        $drive = '';
+        $drive    = '';
 
         if (preg_match('/^[a-zA-Z]:$/', $segments[0]) === 1) {
             $drive = array_shift($segments) . '/';
@@ -350,37 +336,40 @@ final class EmbeddedCompiler implements CompilerInterface
             return;
         }
 
-        if (is_resource($this->process) || $this->pipes !== []) {
+        if ($this->process instanceof Process) {
             $this->close();
         }
 
         $root = dirname(__DIR__);
 
-        $this->process = proc_open(
-            self::command($root, PHP_OS_FAMILY),
-            [
-                0 => ['pipe', 'r'],
-                1 => ['pipe', 'w'],
-                2 => ['pipe', 'w'],
-            ],
-            $this->pipes,
-            null,
-            null,
-            ['bypass_shell' => true],
-        );
+        $this->input = new InputStream();
 
-        if (! is_resource($this->process)) {
-            throw new ProtocolException('Unable to start the Dart Sass embedded compiler.');
+        try {
+            $command = self::command($root, PHP_OS_FAMILY);
+            $process = $this->processFactory instanceof Closure
+                ? ($this->processFactory)($command)
+                : new Process($command);
+
+            if (! $process instanceof Process) {
+                throw new ProtocolException('The process factory did not return a Symfony Process instance.');
+            }
+
+            $this->process = $process;
+            $this->process->setInput($this->input);
+            $this->process->setTimeout(null);
+            $this->process->start();
+        } catch (Throwable $throwable) {
+            $this->close();
+
+            throw new ProtocolException(
+                'Unable to start the Dart Sass embedded compiler: ' . $throwable->getMessage(),
+                previous: $throwable,
+            );
         }
 
         $this->ownsProcess = true;
-
-        foreach ($this->pipes as $pipe) {
-            stream_set_blocking($pipe, false);
-        }
-
-        $this->stderr     = '';
-        $this->readBuffer = '';
+        $this->stderr      = '';
+        $this->readBuffer  = '';
 
         $this->handshake();
     }
@@ -389,7 +378,7 @@ final class EmbeddedCompiler implements CompilerInterface
     {
         $deadline = $this->deadline();
 
-        $this->send(0, self::field(7, ''), $deadline);
+        $this->send(0, self::field(7, ''));
 
         [, $message] = $this->readMessage($deadline);
 
@@ -428,11 +417,11 @@ final class EmbeddedCompiler implements CompilerInterface
         }
     }
 
-    private function send(int $compilationId, string $message, float $deadline): void
+    private function send(int $compilationId, string $message): void
     {
         $packet = self::varint($compilationId) . $message;
 
-        $this->write(self::varint(strlen($packet)) . $packet, $deadline);
+        $this->write(self::varint(strlen($packet)) . $packet);
     }
 
     private static function command(string $root, string $osFamily): array
@@ -444,29 +433,29 @@ final class EmbeddedCompiler implements CompilerInterface
         );
     }
 
-    private function write(string $data, float $deadline): void
+    private function write(string $data): void
     {
-        while ($data !== '') {
-            if ($this->ownsProcess && ! $this->processIsRunning()) {
-                throw new TransportException(
-                    $this->diagnostic('The Dart Sass embedded compiler stopped unexpectedly before writing.'),
-                );
-            }
-
-            $this->waitForStream($this->pipes[0], $deadline, false);
-
-            $written = fwrite($this->pipes[0], $data);
-
-            if ($written === false || $written === 0) {
-                throw new TransportException(
-                    $this->diagnostic('Unable to write to the Dart Sass embedded compiler.'),
-                );
-            }
-
-            $data = substr($data, $written);
+        if (! $this->ownsProcess || ! $this->processIsRunning()) {
+            throw new TransportException(
+                $this->diagnostic('The Dart Sass embedded compiler stopped unexpectedly before writing.'),
+            );
         }
 
-        fflush($this->pipes[0]);
+        try {
+            $this->input->write($data);
+        } catch (Throwable $throwable) {
+            throw new TransportException(
+                $this->diagnostic('Unable to write to the Dart Sass embedded compiler: ' . $throwable->getMessage()),
+            );
+        }
+
+        $this->drainStderr();
+
+        if ($this->ownsProcess && ! $this->processIsRunning()) {
+            throw new TransportException(
+                $this->diagnostic('The Dart Sass embedded compiler stopped unexpectedly after writing.'),
+            );
+        }
     }
 
     private function readMessage(float $deadline): array
@@ -502,9 +491,7 @@ final class EmbeddedCompiler implements CompilerInterface
         $shift = 0;
 
         for ($index = 0; $index < self::MAX_VARINT_BYTES; $index++) {
-            while (strlen($this->readBuffer) <= $index) {
-                $this->readFromStdout($deadline);
-            }
+            $this->fillReadBuffer($index + 1, $deadline);
 
             $byte = ord($this->readBuffer[$index]);
 
@@ -531,23 +518,28 @@ final class EmbeddedCompiler implements CompilerInterface
     private function fillReadBuffer(int $length, float $deadline): void
     {
         while (strlen($this->readBuffer) < $length) {
-            $this->readFromStdout($deadline);
+            $chunk = $this->process->getIncrementalOutput();
+
+            if ($chunk !== '') {
+                $this->readBuffer .= $chunk;
+
+                continue;
+            }
+
+            $this->drainStderr();
+
+            if (! $this->processIsRunning()) {
+                throw new TransportException(
+                    $this->diagnostic('The Dart Sass embedded compiler stopped unexpectedly.'),
+                );
+            }
+
+            if (microtime(true) >= $deadline) {
+                throw new ProtocolException($this->diagnostic('The Dart Sass embedded compiler timed out.'));
+            }
+
+            usleep(self::POLL_INTERVAL_MICROS);
         }
-    }
-
-    private function readFromStdout(float $deadline): void
-    {
-        $this->waitForStream($this->pipes[1], $deadline);
-
-        $chunk = fread($this->pipes[1], self::READ_CHUNK_SIZE);
-
-        if ($chunk === '' || $chunk === false) {
-            throw new TransportException(
-                $this->diagnostic('The Dart Sass embedded compiler stopped unexpectedly.'),
-            );
-        }
-
-        $this->readBuffer .= $chunk;
     }
 
     private function deadline(): float
@@ -555,122 +547,29 @@ final class EmbeddedCompiler implements CompilerInterface
         return microtime(true) + $this->timeout;
     }
 
-    private function waitForStream($stream, float $deadline, bool $read = true): void
-    {
-        while (true) {
-            $remaining = $deadline - microtime(true);
-
-            if ($remaining <= 0) {
-                throw new ProtocolException($this->diagnostic('The Dart Sass embedded compiler timed out.'));
-            }
-
-            $seconds      = (int) $remaining;
-            $microseconds = (int) (($remaining - $seconds) * 1_000_000);
-
-            $reads  = $read ? [$stream, $this->pipes[2]] : [];
-            $writes = $read ? [] : [$stream];
-            $except = [];
-
-            try {
-                $ready = @stream_select($reads, $writes, $except, $seconds, $microseconds);
-            } catch (ValueError) {
-                $ready = false;
-            }
-
-            if ($ready === false) {
-                throw new TransportException($this->diagnostic(
-                    'Unable to communicate with the Dart Sass embedded compiler.',
-                ));
-            }
-
-            if ($ready === 0) {
-                throw new ProtocolException($this->diagnostic('The Dart Sass embedded compiler timed out.'));
-            }
-
-            if ($read && in_array($this->pipes[2], $reads, true)) {
-                $this->drainStderr();
-            }
-
-            if (! $read || in_array($stream, $reads, true)) {
-                return;
-            }
-        }
-    }
-
     private function processIsRunning(): bool
     {
-        if (! is_resource($this->process)) {
-            return false;
-        }
-
-        $status = @proc_get_status($this->process);
-
-        return is_array($status) && ($status['running'] ?? false);
-    }
-
-    private static function waitForProcessExit($process, array $pipes, float $timeout): bool
-    {
-        $deadline = microtime(true) + $timeout;
-
-        do {
-            foreach ([1, 2] as $index) {
-                if (isset($pipes[$index])) {
-                    self::drainAvailableStream($pipes[$index]);
-                }
-            }
-
-            $status = @proc_get_status($process);
-            if (! is_array($status) || ! ($status['running'] ?? false)) {
-                return true;
-            }
-
-            usleep(10_000);
-        } while (microtime(true) < $deadline);
-
-        return false;
-    }
-
-    private static function drainAvailableStream($stream): void
-    {
-        if (! is_resource($stream)) {
-            return;
-        }
-
-        while (true) {
-            $reads  = [$stream];
-            $writes = [];
-            $except = [];
-
-            try {
-                $ready = @stream_select($reads, $writes, $except, 0, 0);
-            } catch (ValueError) {
-                return;
-            }
-
-            if ($ready !== 1) {
-                return;
-            }
-
-            $chunk = fread($stream, self::READ_CHUNK_SIZE);
-
-            if ($chunk === '' || $chunk === false) {
-                return;
-            }
-        }
+        return $this->process instanceof Process && $this->process->isRunning();
     }
 
     private function drainStderr(): void
     {
-        while (($chunk = fread($this->pipes[2], self::READ_CHUNK_SIZE)) !== '' && $chunk !== false) {
-            $this->stderr = substr($this->stderr . $chunk, -self::READ_CHUNK_SIZE);
+        if (! $this->process instanceof Process) {
+            return;
         }
+
+        $chunk = $this->process->getIncrementalErrorOutput();
+
+        if ($chunk === '') {
+            return;
+        }
+
+        $this->stderr = substr($this->stderr . $chunk, -self::STDERR_TAIL_BYTES);
     }
 
     private function diagnostic(string $message): string
     {
-        if (isset($this->pipes[2]) && is_resource($this->pipes[2])) {
-            $this->drainStderr();
-        }
+        $this->drainStderr();
 
         return $this->stderr === '' ? $message : $message . ' stderr: ' . trim($this->stderr);
     }

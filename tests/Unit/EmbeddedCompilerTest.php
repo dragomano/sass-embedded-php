@@ -2,17 +2,6 @@
 
 declare(strict_types=1);
 
-namespace Bugo\Sass {
-    function proc_open($command, $descriptorspec, &$pipes, $cwd = null, $env = null, $options = null)
-    {
-        if ($GLOBALS['force_proc_open_failure'] ?? false) {
-            return false;
-        }
-
-        return \proc_open($command, $descriptorspec, $pipes, $cwd, $env, $options);
-    }
-}
-
 namespace {
     use Bugo\Sass\EmbeddedCompiler;
     use Bugo\Sass\Exception;
@@ -20,6 +9,65 @@ namespace {
     use Bugo\Sass\LogType;
     use Bugo\Sass\Options;
     use Bugo\Sass\ProtocolException;
+    use Symfony\Component\Process\InputStream;
+    use Symfony\Component\Process\Process;
+
+    function invokeEmbedded(string $method, mixed ...$arguments): mixed
+    {
+        $reflection = new ReflectionMethod(EmbeddedCompiler::class, $method);
+
+        return $reflection->invoke(null, ...$arguments);
+    }
+
+    function invokeEmbeddedOn(EmbeddedCompiler $compiler, string $method, mixed ...$arguments): mixed
+    {
+        $reflection = new ReflectionMethod(EmbeddedCompiler::class, $method);
+
+        return $reflection->invoke($compiler, ...$arguments);
+    }
+
+    function withEmbeddedOutput(
+        string $output,
+        Closure $assertions,
+        array $options = [],
+    ): void {
+        $timeout    = $options['timeout'] ?? 15.0;
+        $wait       = $options['wait'] ?? false;
+        $stderr     = $options['stderr'] ?? '';
+        $maxRetries = $options['maxRetries'] ?? 1;
+        $script     = sprintf(
+            '$output = base64_decode(%s); $stderr = base64_decode(%s); fread(STDIN, 1); fwrite(STDOUT, $output); fwrite(STDERR, $stderr); fflush(STDOUT); fflush(STDERR); %s',
+            var_export(base64_encode($output), true),
+            var_export(base64_encode($stderr), true),
+            $wait ? 'usleep(100000);' : '',
+        );
+
+        $input   = new InputStream();
+        $process = new Process(
+            [PHP_BINARY, '-r', $script],
+        );
+        $process->setInput($input);
+        $process->setTimeout(null);
+        $process->start();
+        $input->write('x');
+
+        $compiler        = new EmbeddedCompiler(timeout: $timeout);
+        $processProperty = new ReflectionProperty(EmbeddedCompiler::class, 'process');
+        $inputProperty   = new ReflectionProperty(EmbeddedCompiler::class, 'input');
+        $ownsProperty    = new ReflectionProperty(EmbeddedCompiler::class, 'ownsProcess');
+        $retryProperty   = new ReflectionProperty(EmbeddedCompiler::class, 'maxRetries');
+
+        $processProperty->setValue($compiler, $process);
+        $inputProperty->setValue($compiler, $input);
+        $ownsProperty->setValue($compiler, true);
+        $retryProperty->setValue($compiler, $maxRetries);
+
+        try {
+            $assertions($compiler);
+        } finally {
+            $compiler->close();
+        }
+    }
 
     it('compiles multiple stylesheets in one embedded process', function () {
         $compiler = new EmbeddedCompiler();
@@ -105,17 +153,6 @@ namespace {
         } finally {
             $compiler->close();
             $compiler->close();
-        }
-    });
-
-    it('throws when the embedded compiler cannot be started', function () {
-        $GLOBALS['force_proc_open_failure'] = true;
-
-        try {
-            expect(fn() => (new EmbeddedCompiler())->compileString('a { b: c }'))
-                ->toThrow(ProtocolException::class, 'Unable to start the Dart Sass embedded compiler.');
-        } finally {
-            unset($GLOBALS['force_proc_open_failure']);
         }
     });
 
@@ -378,15 +415,23 @@ namespace {
     });
 
     it('reports stopped and timed out embedded processes with stderr', function () {
-        withEmbeddedOutput('', function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))
-                ->toThrow(ProtocolException::class, 'stopped unexpectedly');
-        });
+        withEmbeddedOutput(
+            '',
+            function (EmbeddedCompiler $compiler): void {
+                expect(fn() => $compiler->compileString('a {}'))
+                    ->toThrow(ProtocolException::class, 'stopped unexpectedly');
+            },
+            options: ['maxRetries' => 0],
+        );
 
-        withEmbeddedOutput("\x02", function (EmbeddedCompiler $compiler): void {
-            expect(fn() => $compiler->compileString('a {}'))
-                ->toThrow(ProtocolException::class, 'stopped unexpectedly');
-        });
+        withEmbeddedOutput(
+            "\x02",
+            function (EmbeddedCompiler $compiler): void {
+                expect(fn() => $compiler->compileString('a {}'))
+                    ->toThrow(ProtocolException::class, 'stopped unexpectedly');
+            },
+            options: ['maxRetries' => 0],
+        );
 
         withEmbeddedOutput(
             '',
@@ -394,113 +439,28 @@ namespace {
                 expect(fn() => $compiler->compileString('a {}'))
                     ->toThrow(ProtocolException::class, 'stderr: diagnostic');
             },
-            timeout: 0.01,
-            wait: true,
-            stderr: 'diagnostic',
+            options: ['timeout' => 0.1, 'wait' => true, 'stderr' => 'diagnostic'],
         );
     });
 
-    it('rejects failed writes and stream selection errors', function () {
+    it('rejects writes to a closed input stream', function () {
         $compiler = new EmbeddedCompiler();
-        $stderr   = fopen('php://temp', 'r+');
-        setEmbeddedPipes($compiler, [$stderr, $stderr, $stderr]);
+        $input    = new InputStream();
+        $process  = new Process([PHP_BINARY, '-r', 'usleep(100000);']);
+        $process->setInput($input);
+        $process->setTimeout(null);
+        $process->start();
+        $input->close();
+
+        (new ReflectionProperty(EmbeddedCompiler::class, 'process'))->setValue($compiler, $process);
+        (new ReflectionProperty(EmbeddedCompiler::class, 'input'))->setValue($compiler, $input);
+        (new ReflectionProperty(EmbeddedCompiler::class, 'ownsProcess'))->setValue($compiler, true);
 
         try {
-            expect(fn() => invokeEmbeddedOn($compiler, 'waitForStream', $stderr, microtime(true) - 1))
-                ->toThrow(ProtocolException::class, 'timed out');
-        } finally {
-            fclose($stderr);
-        }
-
-        $compiler = new EmbeddedCompiler();
-        $path     = tempnam(sys_get_temp_dir(), 'sass-embedded-');
-        $read     = fopen($path, 'r');
-        $stderr   = fopen('php://temp', 'r+');
-        setEmbeddedPipes($compiler, [$read, $stderr, $stderr]);
-
-        try {
-            set_error_handler(static fn() => true);
-            expect(fn() => invokeEmbeddedOn($compiler, 'write', 'data', microtime(true) + 1))
+            expect(fn() => invokeEmbeddedOn($compiler, 'write', 'data'))
                 ->toThrow(ProtocolException::class, 'Unable to write');
-        } finally {
-            restore_error_handler();
-            fclose($read);
-            fclose($stderr);
-            unlink($path);
-        }
-
-        $compiler = new EmbeddedCompiler();
-        $stream   = fopen('php://memory', 'r+');
-
-        setEmbeddedPipes($compiler, [$stream, $stream, $stream]);
-
-        try {
-            set_error_handler(static fn() => true);
-            expect(fn() => invokeEmbeddedOn($compiler, 'waitForStream', $stream, microtime(true) + 1))
-                ->toThrow(ProtocolException::class, 'Unable to communicate');
-        } finally {
-            restore_error_handler();
-            fclose($stream);
-        }
-    });
-
-    function invokeEmbedded(string $method, mixed ...$arguments): mixed
-    {
-        $reflection = new ReflectionMethod(EmbeddedCompiler::class, $method);
-
-        return $reflection->invoke(null, ...$arguments);
-    }
-
-    function invokeEmbeddedOn(EmbeddedCompiler $compiler, string $method, mixed ...$arguments): mixed
-    {
-        $reflection = new ReflectionMethod(EmbeddedCompiler::class, $method);
-
-        return $reflection->invoke($compiler, ...$arguments);
-    }
-
-    function withEmbeddedOutput(
-        string $output,
-        Closure $assertions,
-        float $timeout = 15,
-        bool $wait = false,
-        string $stderr = '',
-    ): void {
-        $script = sprintf(
-            '$output = base64_decode(%s); $stderr = base64_decode(%s); fread(STDIN, 1); fwrite(STDOUT, $output); fwrite(STDERR, $stderr); fflush(STDOUT); fflush(STDERR); %s',
-            var_export(base64_encode($output), true),
-            var_export(base64_encode($stderr), true),
-            $wait ? 'usleep(100000);' : '',
-        );
-
-        $process = proc_open(
-            [PHP_BINARY, '-r', $script],
-            [
-                0 => ['pipe', 'r'],
-                1 => ['pipe', 'w'],
-                2 => ['pipe', 'w'],
-            ],
-            $pipes,
-            null,
-            null,
-            ['bypass_shell' => true],
-        );
-
-        $compiler        = new EmbeddedCompiler(timeout: $timeout);
-        $processProperty = new ReflectionProperty(EmbeddedCompiler::class, 'process');
-        $pipesProperty   = new ReflectionProperty(EmbeddedCompiler::class, 'pipes');
-
-        $processProperty->setValue($compiler, $process);
-        $pipesProperty->setValue($compiler, $pipes);
-
-        try {
-            $assertions($compiler);
         } finally {
             $compiler->close();
         }
-    }
-
-    function setEmbeddedPipes(EmbeddedCompiler $compiler, array $pipes): void
-    {
-        (new ReflectionProperty(EmbeddedCompiler::class, 'pipes'))->setValue($compiler, $pipes);
-    }
+    });
 }

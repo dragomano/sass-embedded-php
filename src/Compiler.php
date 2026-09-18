@@ -158,6 +158,7 @@ class Compiler implements CompilerInterface
         );
     }
 
+    /** @return list<string> */
     protected function buildSassArgs(array $opts): array
     {
         $args = [];
@@ -197,6 +198,7 @@ class Compiler implements CompilerInterface
         return $args;
     }
 
+    /** @param list<string> $command */
     protected function createProcess(array $command): Process
     {
         return new Process($command);
@@ -207,6 +209,7 @@ class Compiler implements CompilerInterface
         return PHP_OS_FAMILY === 'Windows';
     }
 
+    /** @return list<string> */
     protected function getSassCommand(): array
     {
         $binDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'bin';

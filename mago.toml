@@ -89,6 +89,8 @@ ignore = [
     "mixed-method-access",
     "mixed-operand",
     "mixed-return-statement",
+    "non-documented-method",
+    "non-documented-property",
     "non-existent-method",
     "non-existent-property",
     "possible-method-access-on-null",

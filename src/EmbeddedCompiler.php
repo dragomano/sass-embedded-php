@@ -424,6 +424,7 @@ final class EmbeddedCompiler implements CompilerInterface
         $this->write(self::varint(strlen($packet)) . $packet);
     }
 
+    /** @return list<string> */
     private static function command(string $root, string $osFamily): array
     {
         return (
@@ -528,14 +529,14 @@ final class EmbeddedCompiler implements CompilerInterface
 
             $this->drainStderr();
 
+            if (microtime(true) >= $deadline) {
+                throw new ProtocolException($this->diagnostic('The Dart Sass embedded compiler timed out.'));
+            }
+
             if (! $this->processIsRunning()) {
                 throw new TransportException(
                     $this->diagnostic('The Dart Sass embedded compiler stopped unexpectedly.'),
                 );
-            }
-
-            if (microtime(true) >= $deadline) {
-                throw new ProtocolException($this->diagnostic('The Dart Sass embedded compiler timed out.'));
             }
 
             usleep(self::POLL_INTERVAL_MICROS);

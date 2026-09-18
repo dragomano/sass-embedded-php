@@ -55,8 +55,8 @@ namespace {
         $encoded = '';
 
         do {
-            $byte     = $value & 0x7f;
-            $value  >>= 7;
+            $byte    = $value & 0x7f;
+            $value   >>= 7;
             $encoded .= chr($value === 0 ? $byte : $byte | 0x80);
         } while ($value !== 0);
 

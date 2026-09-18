@@ -14,6 +14,8 @@ jobs:
   quality:
     name: Quality
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout
@@ -32,8 +34,6 @@ jobs:
 
       - name: Check code quality
         run: composer mago:check
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Rector
         run: composer check
@@ -42,6 +42,8 @@ jobs:
     name: ${{ matrix.os }} / PHP ${{ matrix.php }}
     needs: quality
     runs-on: ${{ matrix.os }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     strategy:
       fail-fast: false
@@ -90,6 +92,8 @@ jobs:
     name: Sass spec
     needs: test
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout

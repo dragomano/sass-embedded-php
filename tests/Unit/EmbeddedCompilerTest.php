@@ -39,7 +39,7 @@ namespace {
             '$output = base64_decode(%s); $stderr = base64_decode(%s); fread(STDIN, 1); fwrite(STDOUT, $output); fwrite(STDERR, $stderr); fflush(STDOUT); fflush(STDERR); %s',
             var_export(base64_encode($output), true),
             var_export(base64_encode($stderr), true),
-            $wait ? 'usleep(100000);' : '',
+            $wait ? 'usleep(500000);' : '',
         );
 
         $input   = new InputStream();

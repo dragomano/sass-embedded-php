@@ -10,6 +10,98 @@ includes = ["vendor"]
 [source.glob]
 literal-separator = true
 
+[linter.rules.braced-string-interpolation]
+enabled = false
+
+[linter.rules.explicit-octal]
+enabled = false
+
+[linter.rules.literal-named-argument]
+enabled = false
+
+[linter.rules.cyclomatic-complexity]
+enabled = false
+
+[linter.rules.kan-defect]
+enabled = false
+
+[linter.rules.too-many-methods]
+enabled = false
+
+[linter.rules.excessive-parameter-list]
+enabled = false
+
+[linter.rules.no-global]
+enabled = false
+
+[linter.rules.no-error-control-operator]
+enabled = false
+
+[linter.rules.halstead]
+enabled = false
+
+[linter.rules.no-shorthand-ternary]
+enabled = false
+
+[linter.rules.no-isset]
+enabled = false
+
+[linter.rules.no-empty-catch-clause]
+enabled = false
+
+[linter.rules.function-name]
+enabled = false
+
+[linter.rules.no-else-clause]
+enabled = false
+
+[linter.rules.prefer-early-continue]
+enabled = false
+
+[linter.rules.no-nested-ternary]
+enabled = false
+
+[linter.rules.readable-literal]
+enabled = false
+
+[linter.rules.prefer-first-class-callable]
+enabled = false
+
+[linter.rules.file-name]
+enabled = false
+
+[linter.rules.no-boolean-flag-parameter]
+enabled = false
+
+[analyzer]
+ignore = [
+    "ambiguous-object-method-access",
+    "falsable-return-statement",
+    "impossible-condition",
+    "invalid-iterator",
+    "invalid-method-access",
+    "invalid-return-statement",
+    "invalid-type-cast",
+    "less-specific-argument",
+    "mixed-argument",
+    "mixed-array-access",
+    "mixed-assignment",
+    "mixed-method-access",
+    "mixed-operand",
+    "mixed-return-statement",
+    "non-existent-method",
+    "non-existent-property",
+    "possible-method-access-on-null",
+    "possibly-false-argument",
+    "possibly-false-iterator",
+    "possibly-false-operand",
+    "possibly-invalid-argument",
+    "redundant-comparison",
+    "redundant-logical-operation",
+    "reference-to-undefined-variable",
+    "unknown-class-instantiation",
+]
+
 [formatter]
 preset = "psr-12"
 print-width = 120

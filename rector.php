@@ -1,6 +1,9 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 use Rector\Config\RectorConfig;
+use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
 
 return RectorConfig::configure()
     ->withPaths([
@@ -10,4 +13,7 @@ return RectorConfig::configure()
     ->withTypeCoverageLevel(10)
     ->withDeadCodeLevel(10)
     ->withCodeQualityLevel(10)
-    ->withCodingStyleLevel(10);
+    ->withCodingStyleLevel(10)
+    ->withSkip([
+        ClassPropertyAssignToConstructorPromotionRector::class,
+    ]);

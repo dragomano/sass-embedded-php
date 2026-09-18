@@ -2,10 +2,10 @@
 
 ## Environment
 
-- **Generated at**: 2026-09-12T03:58:58+00:00
-- **OS**: Windows 11 25H2 (Build 10.0.26200.9445)
+- **Generated at**: 2026-09-18T07:51:52+00:00
+- **OS**: Windows 11 25H2 (Build 10.0.26200.9457)
 - **PHP version**: 8.6.0beta2
-- **Dart Sass version**: 1.104.0
+- **Dart Sass version**: 1.104.1
 - **scssphp version**: v2.1.0
 - **Measured runs**: 20
 - **Warmup runs**: 3
@@ -16,49 +16,49 @@
 
 | Profile | SCSS size (KB) | SHA-256 |
 |---|---:|---|
-| small | 34.00 | `59569ce8e6b36678156f9432fa5c2d5ce48676d986e285064471b79048518e3b` |
-| medium | 129.65 | `9f037493a69b3534105d1e25960bfe4b0cd014ff7cf0cef5b163eadc3e5a144b` |
-| large | 579.62 | `80bc5be4409f23bcd5694a2f8ea0763eaec21dd4e9afc2df1051e569cd51db82` |
+| small | 34.06 | `8b7d1280791c70642891a591c8168b2f11dbee180585bacd3e08da22d9c10aba` |
+| medium | 129.76 | `ec6811af8bd6ce616c1800399bd2e1930283362e43a65d6d7b14dddb20fd1134` |
+| large | 579.59 | `8654e0756e7ce06b348c72ac3b2f348ceb1a7a10cbcde3fd33815f3662262711` |
 
 ## Results
 
 | Profile | Input | Mode | Compiler | Mean (ms) | Median (ms) | p95 (ms) | Compilations/s | CSS (KB) | PHP memory (MB) |
 |---|---|---|---|---:|---:|---:|---:|---:|---:|
-| small | string | cold | CLI Compiler | 232.749 | 232.884 | 233.806 | 4.30 | 45.29 | 0.20 |
-| small | string | cold | EmbeddedCompiler | 60.803 | 60.713 | 61.534 | 16.45 | 45.29 | 0.36 |
-| small | string | cold | scssphp/scssphp | 63.440 | 61.777 | 75.904 | 15.76 | 36.01 | 5.87 |
-| small | string | warm | CLI Compiler | 232.728 | 233.080 | 234.151 | 4.30 | 45.29 | 0.20 |
-| small | string | warm | EmbeddedCompiler | 17.450 | 15.267 | 22.928 | 57.31 | 45.29 | 0.34 |
-| small | string | warm | scssphp/scssphp | 61.269 | 61.103 | 62.493 | 16.32 | 36.01 | 4.75 |
-| small | file | cold | CLI Compiler | 209.862 | 210.148 | 216.387 | 4.77 | 45.29 | 0.20 |
-| small | file | cold | EmbeddedCompiler | 60.989 | 61.096 | 61.431 | 16.40 | 45.29 | 0.26 |
-| small | file | cold | scssphp/scssphp | 62.590 | 62.317 | 66.752 | 15.98 | 36.01 | 7.04 |
-| small | file | warm | CLI Compiler | 211.131 | 209.510 | 216.889 | 4.74 | 45.29 | 0.20 |
-| small | file | warm | EmbeddedCompiler | 20.124 | 22.493 | 23.268 | 49.69 | 45.29 | 0.24 |
-| small | file | warm | scssphp/scssphp | 62.957 | 61.908 | 64.136 | 15.88 | 36.01 | 6.46 |
-| medium | string | cold | CLI Compiler | 231.619 | 231.586 | 236.228 | 4.32 | 155.93 | 0.62 |
-| medium | string | cold | EmbeddedCompiler | 76.510 | 76.087 | 76.960 | 13.07 | 155.93 | 1.17 |
-| medium | string | cold | scssphp/scssphp | 221.192 | 220.331 | 224.678 | 4.52 | 122.51 | 16.41 |
-| medium | string | warm | CLI Compiler | 232.509 | 232.492 | 233.877 | 4.30 | 155.93 | 0.62 |
-| medium | string | warm | EmbeddedCompiler | 35.797 | 30.965 | 45.711 | 27.94 | 155.93 | 1.15 |
-| medium | string | warm | scssphp/scssphp | 224.467 | 221.698 | 235.219 | 4.45 | 122.51 | 16.53 |
-| medium | file | cold | CLI Compiler | 209.222 | 209.737 | 217.218 | 4.78 | 155.93 | 0.62 |
-| medium | file | cold | EmbeddedCompiler | 76.069 | 75.868 | 76.831 | 13.15 | 155.93 | 0.79 |
-| medium | file | cold | scssphp/scssphp | 223.002 | 221.638 | 236.490 | 4.48 | 122.51 | 24.74 |
-| medium | file | warm | CLI Compiler | 211.581 | 210.006 | 217.479 | 4.73 | 155.93 | 0.62 |
-| medium | file | warm | EmbeddedCompiler | 34.842 | 30.589 | 45.171 | 28.70 | 155.93 | 0.77 |
-| medium | file | warm | scssphp/scssphp | 224.348 | 222.360 | 232.656 | 4.46 | 122.51 | 23.86 |
-| large | string | cold | CLI Compiler | 229.998 | 232.862 | 236.087 | 4.35 | 671.00 | 2.63 |
-| large | string | cold | EmbeddedCompiler | 157.606 | 153.264 | 168.655 | 6.34 | 671.00 | 5.00 |
-| large | string | cold | scssphp/scssphp | 1009.033 | 1007.440 | 1035.572 | 0.99 | 527.90 | 66.02 |
-| large | string | warm | CLI Compiler | 244.633 | 234.953 | 331.124 | 4.09 | 671.00 | 2.63 |
-| large | string | warm | EmbeddedCompiler | 136.532 | 136.616 | 145.305 | 7.32 | 671.00 | 4.98 |
-| large | string | warm | scssphp/scssphp | 1022.960 | 1018.257 | 1055.138 | 0.98 | 527.90 | 66.02 |
-| large | file | cold | CLI Compiler | 206.853 | 204.751 | 212.449 | 4.83 | 671.00 | 2.63 |
-| large | file | cold | EmbeddedCompiler | 163.128 | 165.544 | 167.282 | 6.13 | 671.00 | 3.30 |
-| large | file | cold | scssphp/scssphp | 1005.022 | 997.427 | 1053.362 | 1.00 | 527.90 | 78.12 |
-| large | file | warm | CLI Compiler | 206.687 | 204.832 | 212.107 | 4.84 | 671.00 | 2.63 |
-| large | file | warm | EmbeddedCompiler | 134.376 | 129.720 | 152.027 | 7.44 | 671.00 | 3.28 |
-| large | file | warm | scssphp/scssphp | 1006.166 | 1002.667 | 1024.996 | 0.99 | 527.90 | 78.12 |
+| small | string | cold | CLI Compiler | 227.535 | 227.270 | 228.581 | 4.39 | 45.38 | 0.20 |
+| small | string | cold | EmbeddedCompiler | 226.517 | 226.435 | 227.218 | 4.41 | 45.38 | 0.47 |
+| small | string | cold | scssphp/scssphp | 56.864 | 56.809 | 57.611 | 17.59 | 36.13 | 5.88 |
+| small | string | warm | CLI Compiler | 227.361 | 227.132 | 228.655 | 4.40 | 45.38 | 0.20 |
+| small | string | warm | EmbeddedCompiler | 15.156 | 15.063 | 15.585 | 65.98 | 45.38 | 0.44 |
+| small | string | warm | scssphp/scssphp | 56.534 | 56.190 | 58.137 | 17.69 | 36.13 | 4.75 |
+| small | file | cold | CLI Compiler | 212.594 | 212.162 | 213.773 | 4.70 | 45.38 | 0.20 |
+| small | file | cold | EmbeddedCompiler | 226.362 | 226.228 | 227.950 | 4.42 | 45.38 | 0.33 |
+| small | file | cold | scssphp/scssphp | 57.484 | 57.078 | 57.952 | 17.40 | 36.13 | 7.03 |
+| small | file | warm | CLI Compiler | 212.509 | 212.120 | 214.480 | 4.71 | 45.38 | 0.20 |
+| small | file | warm | EmbeddedCompiler | 15.155 | 15.214 | 15.401 | 65.99 | 45.38 | 0.34 |
+| small | file | warm | scssphp/scssphp | 56.981 | 56.822 | 57.914 | 17.55 | 36.13 | 6.45 |
+| medium | string | cold | CLI Compiler | 227.211 | 226.892 | 228.403 | 4.40 | 155.90 | 0.62 |
+| medium | string | cold | EmbeddedCompiler | 243.294 | 241.608 | 248.911 | 4.11 | 155.90 | 1.48 |
+| medium | string | cold | scssphp/scssphp | 202.641 | 202.798 | 205.636 | 4.93 | 122.59 | 16.41 |
+| medium | string | warm | CLI Compiler | 227.232 | 227.243 | 228.404 | 4.40 | 155.90 | 0.62 |
+| medium | string | warm | EmbeddedCompiler | 30.248 | 30.230 | 30.588 | 33.06 | 155.90 | 1.47 |
+| medium | string | warm | scssphp/scssphp | 204.903 | 203.346 | 207.563 | 4.88 | 122.59 | 16.53 |
+| medium | file | cold | CLI Compiler | 212.010 | 212.293 | 213.022 | 4.72 | 155.90 | 0.62 |
+| medium | file | cold | EmbeddedCompiler | 244.999 | 242.293 | 249.209 | 4.08 | 155.90 | 0.97 |
+| medium | file | cold | scssphp/scssphp | 204.938 | 204.225 | 209.558 | 4.88 | 122.59 | 24.74 |
+| medium | file | warm | CLI Compiler | 212.264 | 211.396 | 213.340 | 4.71 | 155.90 | 0.62 |
+| medium | file | warm | EmbeddedCompiler | 30.200 | 30.255 | 30.660 | 33.11 | 155.90 | 1.09 |
+| medium | file | warm | scssphp/scssphp | 204.780 | 204.915 | 206.879 | 4.88 | 122.59 | 23.86 |
+| large | string | cold | CLI Compiler | 227.342 | 227.297 | 228.538 | 4.40 | 670.72 | 2.63 |
+| large | string | cold | EmbeddedCompiler | 333.385 | 332.389 | 338.928 | 3.00 | 670.72 | 6.25 |
+| large | string | cold | scssphp/scssphp | 945.927 | 945.836 | 956.462 | 1.06 | 527.62 | 66.01 |
+| large | string | warm | CLI Compiler | 244.287 | 226.769 | 331.489 | 4.09 | 670.72 | 2.63 |
+| large | string | warm | EmbeddedCompiler | 201.929 | 203.332 | 226.469 | 4.95 | 670.72 | 4.98 |
+| large | string | warm | scssphp/scssphp | 1191.827 | 1187.577 | 1567.949 | 0.84 | 527.62 | 66.01 |
+| large | file | cold | CLI Compiler | 263.844 | 211.392 | 317.177 | 3.79 | 670.72 | 2.63 |
+| large | file | cold | EmbeddedCompiler | 390.218 | 384.239 | 453.376 | 2.56 | 670.72 | 3.99 |
+| large | file | cold | scssphp/scssphp | 1309.490 | 1312.638 | 1447.589 | 0.76 | 527.62 | 78.12 |
+| large | file | warm | CLI Compiler | 295.506 | 316.537 | 422.390 | 3.38 | 670.72 | 2.63 |
+| large | file | warm | EmbeddedCompiler | 215.300 | 211.232 | 241.183 | 4.64 | 670.72 | 3.28 |
+| large | file | warm | scssphp/scssphp | 1364.369 | 1378.598 | 1676.610 | 0.73 | 527.62 | 78.12 |
 
 Cold mode creates and closes a compiler for every operation. Warm mode reuses one compiler instance for the complete scenario.
